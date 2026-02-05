@@ -30,7 +30,6 @@
                     <p class="stat-value">{{ totalEmployees }}</p>
                 </div>
             </div>
-
             <div class="stat-card">
                 <i class="bi bi-check2-square stat-icon"></i>
                 <div class="stat-info">
@@ -38,7 +37,6 @@
                     <p class="stat-value">{{ averageAttendance }}%</p>
                 </div>
             </div>
-
             <div class="stat-card">
                 <i class="bi bi-exclamation-triangle-fill stat-icon"></i>
                 <div class="stat-info">
@@ -46,7 +44,6 @@
                     <p class="stat-value">{{ totalAbsences }}</p>
                 </div>
             </div>
-
             <div class="stat-card">
                 <i class="bi bi-tsunami stat-icon"></i>
                 <div class="stat-info">
@@ -55,99 +52,109 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="calendar-section">
-        <h3>Attendance Calendar - {{ currentMonthName }}</h3>
-        <div class="calendar-controls">
-            <button @click="prevMonth" class="nav-btn">← Previous </button>
-            <span class="current-month">{{ currentMonthName }} </span>
-            <button @click="nextMonth" class="nav-btn">Next → </button>
-        </div>
+        <div class="calendar-section">
+            <h3>Attendance Calendar - {{ currentMonthName }}</h3>
 
-        <div class="calendar-grid">
-            <div class="calendar-header" v-for="day in ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun']" :key="day">
-                {{ day }}
+            <div class="calendar-controls">
+                <button @click="prevMonth" class="nav-btn">← Previous</button>
+                <span class="current-month">{{ currentMonthName }}</span>
+                <button @click="nextMonth" class="nav-btn">Next →</button>
             </div>
 
-            <div v-for="day in calendarDays" :key="day.date" class="calendar-day"
-                :class="{ 'empty-day': !day.inMonth }">
-                <div class="day-number">{{ day.day }}</div>
-                <div v-if="day.inMonth" class="day-attendance">
-                    <div v-for="record in getAttendanceForDate(day.date)" :key="record.employeeId" class="employee-dot"
-                        :class="getStatusClass(record.status)" :title="`${record.name}: ${record.status}`">
+            <div class="calendar-grid">
+                <div class="calendar-header" v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
+                    :key="day">
+                    {{ day }}
+                </div>
+
+                <div v-for="day in calendarDays" :key="day.date + Math.random()" class="calendar-day"
+                    :class="{ 'empty-day': !day.inMonth }">
+                    <div class="day-number">{{ day.day }}</div>
+                    <div v-if="day.inMonth" class="day-attendance">
+                        <div v-for="record in getAttendanceForDate(day.date)" :key="record.employeeId"
+                            class="employee-dot" :class="getStatusClass(record.status)"
+                            @click="openEditModal(record.employeeId, day.date)"
+                            :title="`${record.name}: ${record.status}`"></div>
                     </div>
+                </div>
+            </div>
+
+            <div class="calendar-legend">
+                <div class="legend-item">
+                    <span class="legend-dot present"></span>Present
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot absent"></span>Absent
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot late"></span>Late
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot leave"></span>On Leave
                 </div>
             </div>
         </div>
 
-        <div class="calendar-legend">
-            <div class="legend-item">
-                <span class="legend-dot present"></span>Present
-            </div>
-            <div class="legend-item">
-                <span class="legend-dot absent"></span>Absent
-            </div>
-            <div class="legend-item">
-                <span class="legend-dot late"></span>Late
-            </div>
-            <div class="legend-item">
-                <span class="legend-dot leave"></span>On Leave
-            </div>
-        </div>
-    </div>
+        <div class="table-section">
+            <h3>Detailed Attendance Records</h3>
+            <div class="table-container">
+                <table class="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Employee ID</th>
+                            <th v-for="date in displayedDates" :key="date"
+                                :class="{ 'today-column': date === todayString }">
+                                {{ formatDate(date) }}
+                            </th>
+                            <th>Present Days</th>
+                            <th>Attendance %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="employee in monthlyAttendance" :key="employee.employeeId">
+                            <td class="employee-name">{{ employee.name }}</td>
+                            <td class="employee-id">{{ employee.employeeId }}</td>
 
-    <div class="table-section">
-        <h3>Detailed Attendance Records</h3>
-        <div class="table-container">
-            <table class="attendance-table">
-                <thead>
-                    <tr>
-                        <th>Employee</th>
-                        <th>Employee ID</th>
-                        <th v-for="date in displayedDates" :key="date">{{ formatDate(date) }}</th>
-                        <th>Present Days</th>
-                        <th>Attendance %</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="employee in filteredAttendance" :key="employee.employeeId">
-                        <td class="employee-name">
-                            <strong>{{ employee.name }}</strong>
-                        </td>
+                            <td v-for="date in displayedDates" :key="date" class="attendance-cell" :class="{
+                                'today-column': date === todayString,
+                                'highlight-status': selectedStatus !== 'all' && employee.attendanceMap[date] === selectedStatus
+                            }">
+                                <span class="status-badge" :class="getStatusClass(employee.attendanceMap[date])"
+                                    @click="openEditModal(employee.employeeId, date)"
+                                    :title="employee.attendanceMap[date]">
+                                    {{ getStatusInitial(employee.attendanceMap[date]) }}
+                                </span>
+                            </td>
 
-                        <td class="employee-id">{{ employee.employeeId }}</td>
-
-                        <td v-for="date in displayedDates" :key="date" class="attendance-cell">
-                            <span class="status-badge" :class="getStatusClass(getEmployeeStatus(employee, date))"
-                                @click="openEditModal(employee, date)">
-                                {{ getStatusInitial(getEmployeeStatus(employee, date)) }}
-                            </span>
-                        </td>
-
-                        <td class="stat-cell">
-                            <strong>{{ calculatePresentDays(employee) }}</strong>
-                        </td>
-
-                        <td class="stat-cell">
-                            <div class="attendance-percentage">
-                                <div class="percentage-bar">
-                                    <div class="percentage-fill"
-                                        :style="{ width: calculateAttendancePercentage(employee) + '%' }">
+                            <td class="stat-cell">
+                                <strong>
+                                    {{Object.values(employee.attendanceMap).filter(s => s === 'Present').length}}
+                                </strong>
+                            </td>
+                            <td class="stat-cell">
+                                <div class="attendance-percentage">
+                                    <div class="percentage-bar">
+                                        <div class="percentage-fill"
+                                            :style="{ width: (Object.values(employee.attendanceMap).filter(s => s === 'Present').length / displayedDates.length * 100) + '%' }">
+                                        </div>
                                     </div>
+                                    <span>
+                                        {{Math.round(Object.values(employee.attendanceMap).filter(s => s ===
+                                            'Present').length / displayedDates.length * 100) }}%
+                                    </span>
                                 </div>
-                                <span>{{ calculateAttendancePercentage(employee) }}%</span>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
 
+        <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
             <div class="modal" @click.stop>
                 <h3>Edit Attendance</h3>
-
                 <p><strong>{{ selectedEmployee?.name }}</strong></p>
 
                 <label>Status</label>
@@ -164,98 +171,101 @@
                 </div>
             </div>
         </div>
-
     </div>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import attendanceData from '@/stores/attendance.json'
+import axios from 'axios'
+
+const API_BASE = 'http://localhost:5000/api'
 
 export default {
     name: 'AttendanceView',
     setup() {
+        const todayString = new Date().toISOString().slice(0, 10)
+
+        const attendanceRecords = ref([])
+        const selectedMonth = ref(new Date().toISOString().slice(0, 7))
+        const selectedStatus = ref('all')
+
         const showEditModal = ref(false)
         const selectedEmployee = ref(null)
         const editStatus = ref('Present')
         const selectedDate = ref(null)
-        const attendanceRecords = ref([])
-        const selectedMonth = ref(new Date().toISOString().slice(0, 7))
 
-        const selectedStatus = ref('all')
-        // const currentDate = ref(new Date())
-
-        onMounted(() => {
-            attendanceRecords.value = attendanceData.attendanceAndLeave || []
-            console.log('Attendance data loaded:', attendanceRecords.value.length, 'employees')
+        onMounted(async () => {
+            try {
+                const res = await axios.get(`${API_BASE}/attendance`)
+                attendanceRecords.value = res.data || []
+            } catch (err) {
+                console.error('Failed to fetch attendance:', err)
+            }
         })
 
-        const filteredAttendance = computed(() => {
+        // --- Compute monthly attendance ---
+        const monthlyAttendance = computed(() => {
             const [year, month] = selectedMonth.value.split('-').map(Number)
-
-            return attendanceRecords.value.map(employee => {
-                const filteredAttendance = employee.attendance.filter(record => {
-                    const recordDate = new Date(record.date)
-                    return recordDate.getFullYear() === year &&
-                        recordDate.getMonth() + 1 === month
-                })
-
+            return attendanceRecords.value.map(emp => {
+                const daysInMonth = new Date(year, month, 0).getDate()
+                const attendanceMap = {}
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                    const record = emp.attendance.find(a => a.date === dateStr)
+                    attendanceMap[dateStr] = record ? record.status : 'Not Recorded'
+                }
                 return {
-                    ...employee,
-                    attendance: filteredAttendance
+                    ...emp,
+                    attendanceMap
                 }
             })
         })
 
-        const totalEmployees = computed(() => attendanceRecords.value.length)
+        // --- Stats cards ---
+        const totalEmployees = computed(() => monthlyAttendance.value.length)
 
         const averageAttendance = computed(() => {
-            if (filteredAttendance.value.length === 0) return 0
-
-            const totalDays = filteredAttendance.value.reduce((sum, emp) => {
-                return sum + emp.attendance.length
-            }, 0)
-
-            const presentDays = filteredAttendance.value.reduce((sum, emp) => {
-                const present = emp.attendance.filter(a => a.status === 'Present').length
-
-                return sum + present
-            }, 0)
-
-            return totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0
+            if (!monthlyAttendance.value.length) return 0
+            let totalDays = 0
+            let presentDays = 0
+            monthlyAttendance.value.forEach(emp => {
+                const days = Object.values(emp.attendanceMap)
+                totalDays += days.length
+                presentDays += days.filter(s => s === 'Present').length
+            })
+            return totalDays ? Math.round((presentDays / totalDays) * 100) : 0
         })
 
-        const totalAbsences = computed(() => {
-            return filteredAttendance.value.reduce((sum, emp) => {
-                return sum + emp.attendance.filter(a => a.status === 'Absent').length
-            }, 0)
-        })
+        const totalAbsences = computed(() =>
+            monthlyAttendance.value.reduce(
+                (sum, emp) => sum + Object.values(emp.attendanceMap).filter(s => s === 'Absent').length,
+                0
+            )
+        )
 
-        const totalOnLeave = computed(() => {
-            return filteredAttendance.value.reduce((sum, emp) => {
-                return sum + emp.attendance.filter(a => a.status === 'On Leave').length
-            }, 0)
-        })
+        const totalOnLeave = computed(() =>
+            monthlyAttendance.value.reduce(
+                (sum, emp) => sum + Object.values(emp.attendanceMap).filter(s => s === 'On Leave').length,
+                0
+            )
+        )
 
+        // --- Calendar and table helpers ---
         const currentMonthName = computed(() => {
             return new Date(selectedMonth.value + '-01').toLocaleDateString('en-US', {
-                month: 'long', year: 'numeric'
+                month: 'long',
+                year: 'numeric'
             })
-        })
-        const currentYear = computed(() => {
-            return new Date(selectedMonth.value + '-01').getFullYear()
         })
 
         const displayedDates = computed(() => {
             const [year, month] = selectedMonth.value.split('-').map(Number)
             const daysInMonth = new Date(year, month, 0).getDate()
             const dates = []
-
             for (let day = 1; day <= daysInMonth; day++) {
-                dates.push(`${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`)
+                dates.push(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
             }
-
-            return dates.slice(21, 31)
+            return dates
         })
 
         const calendarDays = computed(() => {
@@ -263,140 +273,118 @@ export default {
             const firstDay = new Date(year, month - 1, 1)
             const lastDay = new Date(year, month, 0)
             const daysInMonth = lastDay.getDate()
-
             const days = []
 
             const startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1
-            for (let i = 0; i < startDay; i++) {
-                days.push({ day: '', date: '', inMonth: false })
-            }
-
+            for (let i = 0; i < startDay; i++) days.push({ day: '', date: '', inMonth: false })
             for (let day = 1; day <= daysInMonth; day++) {
-                const date = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+                const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
                 days.push({ day, date, inMonth: true })
             }
-
             return days
         })
-        function getEmployeeStatus(employee, date) {
-            const record = employee.attendance.find(a => a.date === date)
-            return record ? record.status : 'Not Recorded'
-        }
 
-        function calculatePresentDays(employee) {
-            return employee.attendance.filter(a => a.status === 'Present').length
-        }
-
-        function calculateAttendancePercentage(employee) {
-            const totalDays = employee.attendance.length
-            const presentDays = employee.attendance.filter(a => a.status === 'Present').length
-            return totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0
-        }
-
-        function getAttendanceForDate(date) {
+        const getAttendanceForDate = date => {
             const records = []
-            filteredAttendance.value.forEach(employee => {
-                const attendance = employee.attendance.find(a => a.date === date)
-                if (attendance) {
-                    records.push({
-                        employeeId: employee.employeeId,
-                        name: employee.name,
-                        status: attendance.status
-                    })
+            monthlyAttendance.value.forEach(emp => {
+                const status = emp.attendanceMap[date]
+                if (status && status !== 'Not Recorded') {
+                    records.push({ employeeId: emp.employeeId, name: emp.name, status })
                 }
             })
             return records.slice(0, 20)
         }
-        function getStatusClass(status) {
-            const statusMap = {
-                'Present': 'present',
-                'Absent': 'absent',
-                'Late': 'late',
-                'On Leave': 'leave',
-                'Not recorded': 'not-recorded'
-            }
-            return statusMap[status] || 'not-recorded'
+
+        const getStatusClass = status => {
+            const map = { Present: 'present', Absent: 'absent', Late: 'late', 'On Leave': 'leave', 'Not Recorded': 'not-recorded' }
+            return map[status] || 'not-recorded'
         }
 
-        function getStatusInitial(status) {
-            const initialMap = {
-                'Present': 'P',
-                'Absent': 'A',
-                'Late': 'L',
-                'On Leave': 'LV',
-                'Not Recorded': '-'
-            }
-            return initialMap[status] || '-'
-        }
-        function formatDate(dateString) {
-            const date = new Date(dateString)
-            return date.toLocaleDateString('en-US', {
-                day: 'numeric',
-                month: 'short'
-            })
+        const getStatusInitial = status => {
+            const map = { Present: 'P', Absent: 'A', Late: 'L', 'On Leave': 'LV', 'Not Recorded': '-' }
+            return map[status] || '-'
         }
 
-        function prevMonth() {
-            const date = new Date(selectedMonth.value + '-01')
-            date.setMonth(date.getMonth() - 1)
-            selectedMonth.value = date.toISOString().slice(0, 7)
+        const formatDate = dateString => {
+            const d = new Date(dateString)
+            return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
         }
 
-        function nextMonth() {
-            const date = new Date(selectedMonth.value + '-01')
-            date.setMonth(date.getMonth() + 1)
-            selectedMonth.value = date.toISOString().slice(0, 7)
+        // --- Month navigation ---
+        const prevMonth = () => {
+            const d = new Date(selectedMonth.value + '-01')
+            d.setMonth(d.getMonth() - 1)
+            selectedMonth.value = d.toISOString().slice(0, 7)
         }
 
-        function resetFilters() {
+        const nextMonth = () => {
+            const d = new Date(selectedMonth.value + '-01')
+            d.setMonth(d.getMonth() + 1)
+            selectedMonth.value = d.toISOString().slice(0, 7)
+        }
+
+        const resetFilters = () => {
             selectedMonth.value = new Date().toISOString().slice(0, 7)
             selectedStatus.value = 'all'
         }
 
-        function openEditModal(employee, date) {
+        // --- Edit modal ---
+        const openEditModal = (employeeId, date) => {
+            const employee = attendanceRecords.value.find(e => e.employeeId === employeeId)
             selectedEmployee.value = employee
             selectedDate.value = date
-            editStatus.value = this.getEmployeeStatus(employee, date)
+
+            const record = employee.attendance.find(a => a.date === date)
+            editStatus.value = record ? record.status : 'Present'
+
             showEditModal.value = true
         }
 
-        function closeEditModal() {
+        const closeEditModal = () => {
             showEditModal.value = false
             selectedEmployee.value = null
             selectedDate.value = null
         }
 
-        function saveEdit() {
-            const record = selectedEmployee.value.attendance.find(
-                a => a.date === selectedDate.value
-            )
-            if (record) {
-                record.status = editStatus.value
-            } else {
-                selectedEmployee.value.attendance.push({
-                    date: selectedDate.value,
-                    status: editStatus.value
-                })
+        const saveEdit = async () => {
+            if (!selectedEmployee.value || !selectedDate.value) return
+
+            const recordIndex = selectedEmployee.value.attendance.findIndex(a => a.date === selectedDate.value)
+
+            const payload = {
+                employeeId: selectedEmployee.value.employeeId,
+                date: selectedDate.value,
+                status: editStatus.value
             }
-            closeEditModal()
+
+            try {
+                if (recordIndex > -1) {
+                    await axios.put(`${API_BASE}/attendance/${selectedEmployee.value.employeeId}/${selectedDate.value}`, payload)
+                    selectedEmployee.value.attendance[recordIndex].status = editStatus.value
+                } else {
+                    await axios.post(`${API_BASE}/attendance`, payload)
+                    selectedEmployee.value.attendance.push(payload)
+                }
+
+                closeEditModal()
+            } catch (err) {
+                console.error('Failed to save attendance:', err)
+                alert('Could not save attendance. Please try again.')
+            }
         }
 
         return {
             attendanceRecords,
             selectedMonth,
             selectedStatus,
-            filteredAttendance,
+            monthlyAttendance,
             totalEmployees,
             averageAttendance,
             totalAbsences,
             totalOnLeave,
             currentMonthName,
-            currentYear,
             displayedDates,
             calendarDays,
-            getEmployeeStatus,
-            calculatePresentDays,
-            calculateAttendancePercentage,
             getAttendanceForDate,
             getStatusClass,
             getStatusInitial,
@@ -409,11 +397,11 @@ export default {
             editStatus,
             openEditModal,
             closeEditModal,
-            saveEdit
+            saveEdit,
+            todayString
         }
     }
 }
-
 </script>
 
 <style scoped>
@@ -521,6 +509,7 @@ export default {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 30px;
+    margin-bottom: 30px;
 }
 
 .stat-card {
@@ -966,6 +955,8 @@ export default {
     .attendance-table td {
         padding: 8px 10px;
         font-size: 14px;
+        position: relative;
+        z-index: 1;
     }
 
     .status-badge {
@@ -1008,5 +999,21 @@ export default {
     /* justify-content: center; */
     gap: 12px;
     margin: 20px;
+}
+
+.today-column {
+    position: relative
+}
+
+.today-column::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(52, 152, 219, 0.18);
+    z-index: 0;
+}
+
+.dark-mode .today-column {
+    background: rgba(93, 173, 226, 0.25);
 }
 </style>

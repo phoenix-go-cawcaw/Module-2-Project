@@ -1,113 +1,176 @@
 <script>
-import employeeInfo from '@/stores/employee_info.json' //import from backend
+import axios from "axios";
 
 export default {
-    name: 'Employees',
+    name: "Employees",
     data() {
         return {
             employees: [],
-            searchText: '',
-            isLoading: true
+            searchText: "",
+            isLoading: true,
+
+            showEditModal: false,
+            selectedEmployee: {
+                employee_id: null,
+                name: "",
+                position: "",
+                department: "",
+                salary: "",
+                contact: "",
+                employment_history: "",
+            },
         };
     },
     computed: {
         filteredEmployees() {
-            if (!this.searchText) {
-                return this.employees;
-            }
+            if (!this.searchText) return this.employees;
             const search = this.searchText.toLowerCase();
-            return this.employees.filter(employee => {
+            return this.employees.filter((employee) => {
                 return (
-                    employee.name.toLowerCase().includes(search) ||
-                    employee.position.toLowerCase().includes(search) ||
-                    employee.department.toLowerCase().includes(search)
+                    (employee.name || "").toLowerCase().includes(search) ||
+                    (employee.position || "").toLowerCase().includes(search) ||
+                    (employee.department || "").toLowerCase().includes(search)
                 );
             });
-        }
-    },
-    mounted() {
-        this.employees = employeeInfo.employeeInformation || employeeInfo;
-        this.isLoading = false;
+        },
     },
     methods: {
-        editEmployees() {
-            // For future implementation: Open bulk edit mode or edit form
-            console.log('Opening edit mode for employees');
-            alert('Edit functionality will be implemented soon! You can edit multiple employees or select one to edit.');
+        async fetchEmployees() {
+            try {
+                const res = await axios.get("http://localhost:5000/api/employees");
+                this.employees = res.data;
+            } catch (err) {
+                console.error("Failed to fetch employees:", err);
+                alert("Failed to load employees from backend.");
+            } finally {
+                this.isLoading = false;
+            }
         },
-        addNewEmployee() {
-            // For future implementation: Open add employee form
-            console.log('Adding new employee');
-            alert('Add new employee functionality will be implemented soon!');
+
+        openEdit(employee) {
+            this.selectedEmployee = { ...employee };
+            this.showEditModal = true;
         },
-        exportData() {
-            // For future implementation: Export data as CSV/Excel
-            console.log('Exporting employee data');
-            alert('Export functionality will be implemented soon!');
-        }
-    }
-}
+
+        closeModal() {
+            this.showEditModal = false;
+        },
+
+        async saveEdit() {
+            try {
+                const { employee_id, ...payload } = this.selectedEmployee;
+                await axios.put(`http://localhost:5000/api/employees/${employee_id}`, payload);
+                await this.fetchEmployees();
+                this.showEditModal = false;
+            } catch (err) {
+                console.error("Failed to update employee:", err);
+                alert("Failed to update employee.");
+            }
+        },
+    },
+    async mounted() {
+        await this.fetchEmployees();
+    },
+};
 </script>
 
 <template>
     <div class="page">
         <h1>Employees</h1>
+
         <div class="search">
-            <input type="text" v-model="searchText" placeholder="Search Employees..." class="search-input">
+            <input type="text" v-model="searchText" placeholder="Search Employees..." class="search-input" />
         </div>
 
         <div class="employee-cards">
-            <div v-for="employee in filteredEmployees" :key="employee.employeeId" class="employee-card">
+            <div v-for="employee in filteredEmployees" :key="employee.employee_id" class="employee-card">
                 <div class="card-header">
                     <h3>{{ employee.name }}</h3>
-                    <span class="card-id">ID: {{ employee.employeeId }}</span>
+                    <span class="card-id">ID: {{ employee.employee_id }}</span>
                 </div>
                 <div class="card-content">
                     <p><b>Position:</b> {{ employee.position }}</p>
                     <p><b>Department:</b> {{ employee.department }}</p>
                     <p><b>Contact:</b> {{ employee.contact }}</p>
-                    <p><b>History:</b> {{ employee.employmentHistory }}</p>
+                    <p><b>History:</b> {{ employee.employment_history }}</p>
                     <p><b>Salary:</b> {{ employee.salary }}</p>
                 </div>
+
+                <button class="action-btn edit" @click="openEdit(employee)">
+                    Edit
+                </button>
             </div>
 
-            <div v-if="filteredEmployees.length === 0" class="no-results">
+            <div v-if="filteredEmployees.length === 0 && !isLoading" class="no-results">
                 No employees found. Please try a different search.
             </div>
-            <div v-if="employees.length === 0" class="loading">
+
+            <div v-if="isLoading" class="loading">
                 Loading employees...
             </div>
         </div>
 
-        <div class="page-actions" v-if="filteredEmployees.length > 0">
-            <button @click="addNewEmployee" class="action-btn primary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Add New Employee
-            </button>
-            <button @click="editEmployees" class="action-btn edit">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                </svg>
-                Edit Employees
-            </button>
-            <button @click="exportData" class="action-btn secondary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Export Data
-            </button>
+        <div v-if="showEditModal" class="modal-backdrop">
+            <div class="modal">
+                <h2>Edit Employee</h2>
+                <input v-model="selectedEmployee.name" placeholder="Name" />
+                <input v-model="selectedEmployee.position" placeholder="Position" />
+                <input v-model="selectedEmployee.department" placeholder="Department" />
+                <input v-model="selectedEmployee.salary" placeholder="Salary" />
+                <input v-model="selectedEmployee.contact" placeholder="Contact" />
+                <textarea v-model="selectedEmployee.employment_history" placeholder="Employment History"></textarea>
+
+                <div class="modal-actions">
+                    <button class="action-btn primary" @click="saveEdit">Save</button>
+                    <button class="action-btn secondary" @click="closeModal">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 </template>
+
+<style scoped>
+.page {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    min-height: calc(100vh - 120px);
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 500px;
+}
+
+.modal input,
+.modal textarea {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+</style>
+
 
 
 <style scoped>
@@ -303,6 +366,39 @@ h1 {
 
 .dark-mode .page-actions {
     border-top-color: #444;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 500px;
+}
+
+.modal input,
+.modal textarea {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
 }
 
 @media (max-width: 1200px) and (min-width: 768px) {

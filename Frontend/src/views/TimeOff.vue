@@ -100,8 +100,8 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button @click="saveEdit">Save</button>
-                    <button @click="cancelEdit">Cancel</button>
+                    <button @click="saveEdit" class="save-btn">Save</button>
+                    <button @click="cancelEdit" class="cancel-btn">Cancel</button>
                 </div>
             </div>
         </div>
@@ -639,14 +639,14 @@ export default {
     width: 100%;
 }
 
-.model-actions{
+.modal-actions{
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
     gap: 10px;
     margin-top: 20px;
 }
 
-.btn.save{
+.save-btn{
     background:#3498db;
     color: white;
     border: none;
@@ -655,7 +655,7 @@ export default {
     cursor: pointer;
 }
 
-.btn.cancel{
+.cancel-btn{
     background: #bdc3c7;
     color: #2c3e50;
     border: none;
@@ -664,8 +664,21 @@ export default {
     cursor: pointer;
 }
 
-.btn-approve,.btn-deny,.btn_edit{
-    gap: 12px;
+.btn-approve,.btn-deny,.btn-edit{
+    background: #3498db;
+    color: white;
+    border: 1px solid #3498db;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-weight: bold;
+    
 }
 
+.request-actions{
+    display: flex;
+    gap: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+   
+}
 </style>

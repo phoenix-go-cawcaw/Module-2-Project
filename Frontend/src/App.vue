@@ -1,16 +1,18 @@
 <script>
 import Header from './components/Header.vue';
 import SideBarNav from './components/SideBarNav.vue';
-import { inject } from 'vue';
+import { reactive, provide } from 'vue';
 
 export default {
   name: 'App',
   components: {
-    Header,
-    SideBarNav
+    Header, SideBarNav
   },
   setup() {
-    const globalState = inject('globalState');
+    const globalState = reactive({
+      isAuthenticated: localStorage.getItem('isAuthenticated') === 'true'
+    });
+    provide('globalState', globalState);
     return { globalState };
   },
   data() {
@@ -21,10 +23,15 @@ export default {
   },
   computed: {
     isLoggedIn() {
-      return this.globalState.isAuthenticated;
+      return this.globalState?.isAuthenticated || false;
     }
   },
   methods: {
+    login() {
+      this.globalState.isAuthenticated = true;
+      localStorage.setItem('isAuthenticated', 'true');
+      this.$router.push('/employees');
+    },
     toggleDarkMode() {
       this.darkMode = !this.darkMode;
       localStorage.setItem('darkMode', this.isDarkMode)
@@ -42,7 +49,7 @@ export default {
   mounted() {
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode) {
-      this.DarkMode = savedDarkMode === 'true'
+      this.darkMode = savedDarkMode === 'true'
     }
 
     if (!this.isLoggedIn && this.$route.path !== '/') {

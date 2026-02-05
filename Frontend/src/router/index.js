@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
+import Employees from "../views/Employees.vue";
 
 const routes = [
   {
@@ -6,15 +7,10 @@ const routes = [
     name: "Login",
     component: () => import("../views/Login.vue"),
   },
-  // {
-  //   path: "/dashboard",
-  //   name: "Dashboard",
-  //   component: () => import("../views/Dashboard.vue"),
-  // },
   {
     path: "/employees",
     name: "Employees",
-    component: () => import("../views/Employees.vue"),
+    component: Employees
   },
   {
     path: "/attendance",
@@ -49,7 +45,7 @@ const routes = [
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
 })
 
 router.beforeEach((to, from, next) => {
