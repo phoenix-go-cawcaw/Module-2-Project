@@ -51,9 +51,9 @@
                         <p><strong>Reason:</strong> {{ request.reason }}</p>
                     </div>
                     <div class="request-actions">
-                        <button class="btn approve" @click="updateStatus(request.id,'Approved')">Approve</button>
-                        <button class="btn deny" @click="updateStatus(request.id,'Denied')">Deny</button>
-                        <button class="btn edit" @click="startEdit(request)">Edit</button>
+                        <button class="btn-approve" @click="updateStatus(request.id,'Approved')">Approve</button>
+                        <button class="btn-deny" @click="updateStatus(request.id,'Denied')">Deny</button>
+                        <button class="btn-edit" @click="startEdit(request)">Edit</button>
                     </div>
                 </div>
             </div>
@@ -664,9 +664,8 @@ export default {
     cursor: pointer;
 }
 
-.request-actions.btn{
-    padding: 6px 14px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
+.btn-approve,.btn-deny,.btn_edit{
+    gap: 12px;
 }
+
 </style>
