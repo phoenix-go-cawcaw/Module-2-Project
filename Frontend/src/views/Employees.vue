@@ -9,7 +9,8 @@ export default {
             searchText: "",
             isLoading: true,
 
-            showEditModal: false,
+            showModal: false,
+            isEditMode: false,
             selectedEmployee: {
                 employee_id: null,
                 name: "",
@@ -47,24 +48,55 @@ export default {
             }
         },
 
+        openAddModal() {
+            this.selectedEmployee = {
+                employee_id: null,
+                name: "",
+                position: "",
+                department: "",
+                salary: "",
+                contact: "",
+                employment_history: "",
+            };
+            this.isEditMode = false;
+            this.showModal = true;
+        },
+
         openEdit(employee) {
             this.selectedEmployee = { ...employee };
-            this.showEditModal = true;
+            this.isEditMode = true;
+            this.showModal = true;
         },
 
         closeModal() {
-            this.showEditModal = false;
+            this.showModal = false;
         },
 
-        async saveEdit() {
+        async saveEmployee() {
             try {
-                const { employee_id, ...payload } = this.selectedEmployee;
-                await axios.put(`http://localhost:5000/api/employees/${employee_id}`, payload);
+                if (this.isEditMode) {
+                    const { employee_id, ...payload } = this.selectedEmployee;
+                    await axios.put(`http://localhost:5000/api/employees/${employee_id}`, payload);
+                } else {
+                    const payload = { ...this.selectedEmployee };
+                    await axios.post("http://localhost:5000/api/employees", payload);
+                }
                 await this.fetchEmployees();
-                this.showEditModal = false;
+                this.showModal = false;
             } catch (err) {
-                console.error("Failed to update employee:", err);
-                alert("Failed to update employee.");
+                console.error("Failed to save employee:", err);
+                alert("Failed to save employee.");
+            }
+        },
+
+        async deleteEmployee(employee_id) {
+            if (!confirm("Are you sure you want to delete this employee?")) return;
+            try {
+                await axios.delete(`http://localhost:5000/api/employees/${employee_id}`);
+                await this.fetchEmployees();
+            } catch (err) {
+                console.error("Failed to delete employee:", err);
+                alert("Failed to delete employee.");
             }
         },
     },
@@ -108,6 +140,11 @@ export default {
             <div v-if="isLoading" class="loading">
                 Loading employees...
             </div>
+            <div class="page-actions">
+                <button class="action-btn primary" @click="openAddModal">
+                    Add Employee
+                </button>
+            </div>
         </div>
 
         <div v-if="showEditModal" class="modal-backdrop">
@@ -121,7 +158,9 @@ export default {
                 <textarea v-model="selectedEmployee.employment_history" placeholder="Employment History"></textarea>
 
                 <div class="modal-actions">
-                    <button class="action-btn primary" @click="saveEdit">Save</button>
+                    <button class="action-btn primary" @click="saveEmployee">
+                        {{ isEditMode ? "Save Changes" : "Add Employee" }}
+                    </button>
                     <button class="action-btn secondary" @click="closeModal">Cancel</button>
                 </div>
             </div>
@@ -399,6 +438,14 @@ h1 {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
+}
+
+.page-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-top: 20px;
 }
 
 @media (max-width: 1200px) and (min-width: 768px) {

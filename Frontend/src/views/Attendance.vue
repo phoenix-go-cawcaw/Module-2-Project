@@ -203,7 +203,6 @@ export default {
             }
         })
 
-        // --- Compute monthly attendance ---
         const monthlyAttendance = computed(() => {
             const [year, month] = selectedMonth.value.split('-').map(Number)
             return attendanceRecords.value.map(emp => {
@@ -221,7 +220,6 @@ export default {
             })
         })
 
-        // --- Stats cards ---
         const totalEmployees = computed(() => monthlyAttendance.value.length)
 
         const averageAttendance = computed(() => {
@@ -250,7 +248,6 @@ export default {
             )
         )
 
-        // --- Calendar and table helpers ---
         const currentMonthName = computed(() => {
             return new Date(selectedMonth.value + '-01').toLocaleDateString('en-US', {
                 month: 'long',
@@ -310,7 +307,6 @@ export default {
             return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
         }
 
-        // --- Month navigation ---
         const prevMonth = () => {
             const d = new Date(selectedMonth.value + '-01')
             d.setMonth(d.getMonth() - 1)
@@ -328,7 +324,6 @@ export default {
             selectedStatus.value = 'all'
         }
 
-        // --- Edit modal ---
         const openEditModal = (employeeId, date) => {
             const employee = attendanceRecords.value.find(e => e.employeeId === employeeId)
             selectedEmployee.value = employee
