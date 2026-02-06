@@ -53,25 +53,26 @@ app.patch(
 );
 app.delete("/api/leave_requests/:leave_id", deleteleave_requestsCon);
 
-app.post("/api/employees", async (req, res) => {
-  const { name, position, department, salary, contact, employment_history } =
-    req.body;
-  const result = await insertEmployee_InfoDb(
-    name,
-    position,
-    department,
-    salary,
-    employment_history,
-    contact,
-  );
-  res.json(result);
-});
+// duplicates that bypass the controllers commented it out for now -zahraa
+// app.post("/api/employees", async (req, res) => {
+//   const { name, position, department, salary, contact, employment_history } =
+//     req.body;
+//   const result = await insertEmployee_InfoDb(
+//     name,
+//     position,
+//     department,
+//     salary,
+//     employment_history,
+//     contact,
+//   );
+//   res.json(result);
+// });
 
-app.delete("/api/employees/:id", async (req, res) => {
-    const { id } = req.params;
-    const result = await deleteEmployee_infoDb(id);
-    res.json(result);
-});
+// app.delete("/api/employees/:id", async (req, res) => {
+//     const { id } = req.params;
+//     const result = await deleteEmployee_infoDb(id);
+//     res.json(result);
+// });
 
 app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");

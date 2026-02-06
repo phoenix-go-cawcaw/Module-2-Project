@@ -1,72 +1,111 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import employeeData from '@/stores/employee_info.json';
-import attendanceData from '@/stores/attendance.json'
+import axios from 'axios';
+
+const API_BASE = 'http://localhost:5000/api';
 
 const selectedDepartment = ref('all')
 const selectedPerformance = ref('all')
 const activeCategory = ref('top')
 const employees = ref([])
+const attendanceData = ref([])
+const leaveRequests = ref([])
+const isLoading = ref(true)
 
-onMounted(() => {
-    loadAndProcessData()
-    console.log(overallStats);
-     
-})
+// Fetch all data
+const fetchAllData = async () => {
+    try {
+        isLoading.value = true;
+        const [employeesRes, attendanceRes, leaveRes] = await Promise.all([
+            axios.get(`${API_BASE}/employees`),
+            axios.get(`${API_BASE}/attendance`),
+            axios.get(`${API_BASE}/leave_requests`)
+        ]);
 
-function loadAndProcessData() {
-    employees.value = employeeData.employeeInformation.map(emp => {
-        // console.log(attendanceData);
-        const attendanceRecord = attendanceData.attendanceAndLeave.find(a => a.employeeId === emp.employeeId)
+        employees.value = employeesRes.data || [];
+        attendanceData.value = attendanceRes.data || [];
+        leaveRequests.value = leaveRes.data || [];
 
-        const attendance = attendanceRecord?.attendance || []
-        const presentDays = attendance.filter(a => a.status === 'Present').length
-        const totalDays = attendance.length
-        const attendancePercentage = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0
+        processPerformanceData();
+    } catch (err) {
+        console.error('Failed to fetch data:', err);
+        alert('Failed to load performance data.');
+    } finally {
+        isLoading.value = false;
+    }
+}
 
-        let performanceLevel = 'good'
-        let evaluationNotes = 'Consistent attendance and performance.'
-        let recommendation = 'Continue current practices.'
-        let concerns = []
-        let actions = []
+// Process data for performance evaluation
+const processPerformanceData = () => {
+    employees.value = employees.value.map(emp => {
+        // Get employee attendance
+        const employeeAttendance = attendanceData.value.filter(a => a.employee_id === emp.employee_id);
+        
+        // Calculate attendance stats
+        const presentDays = employeeAttendance.filter(a => a.status === 'Present').length;
+        const totalDays = employeeAttendance.length;
+        const attendancePercentage = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+        
+        // Get leave requests
+        const employeeLeaves = leaveRequests.value.filter(l => l.employee_id === emp.employee_id);
+        const pendingLeaves = employeeLeaves.filter(l => l.status === 'Pending');
+        
+        // Calculate performance level
+        let performanceLevel = 'Good';
+        let evaluationNotes = 'Consistent attendance and performance.';
+        let recommendation = 'Continue current practices.';
+        let concerns = [];
+        let actions = [];
 
         if (attendancePercentage >= 90) {
-            performanceLevel = 'Excellent'
-            evaluationNotes = 'Exceptional attendance record.'
-            recommendation = 'Consider for recognition.'
+            performanceLevel = 'Excellent';
+            evaluationNotes = 'Exceptional attendance record.';
+            recommendation = 'Consider for recognition.';
         } else if (attendancePercentage >= 80) {
-            performanceLevel = 'Good'
-            evaluationNotes = 'Reliable attendance with minor absences.'
-            recommendation = 'Monitor for consistency.'
+            performanceLevel = 'Good';
+            evaluationNotes = 'Reliable attendance with minor absences.';
+            recommendation = 'Monitor for consistency.';
         } else {
-            performanceLevel = 'Needs improvement'
-            evaluationNotes = 'Attendance below acceptable levels.'
-            concerns = ['Frequent absences affecting productivity']
-            actions = ['Schedule performance review', 'Discuss attendance issues']
-            recommendation = 'Immediate follow-up required.'
+            performanceLevel = 'Needs improvement';
+            evaluationNotes = 'Attendance below acceptable levels.';
+            concerns = ['Frequent absences affecting productivity'];
+            actions = ['Schedule performance review', 'Discuss attendance issues'];
+            recommendation = 'Immediate follow-up required.';
         }
 
-        const leaveRequests = attendanceRecord?.leaveRequests || []
-        const pendingRequests = leaveRequests.filter(l => l.status === 'pending' && l.date.includes('2024'))
-        if (pendingRequests.length > 0) {
-            concerns.push('Old pending leave requests')
-            actions.push('Resolve 2024 leave requests')
+        // Add leave concerns
+        if (pendingLeaves.length > 0) {
+            concerns.push(`${pendingLeaves.length} pending leave requests`);
+            actions.push('Resolve pending leave requests');
         }
+
+        // Get recent month for evaluation period
+        const recentMonth = employeeAttendance.length > 0 
+            ? new Date(employeeAttendance[0].date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+            : new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
         return {
             ...emp,
-            ...attendanceRecord,
+            attendance: employeeAttendance,
+            leaveRequests: employeeLeaves,
             presentDays,
             totalDays,
-            absences: attendance.filter(a => a.status === 'Absent').length,
+            absences: employeeAttendance.filter(a => a.status === 'Absent').length,
             attendancePercentage,
             performanceLevel,
             evaluationNotes,
             recommendation,
             concerns,
-            actions
-        }
-    })
+            actions,
+            recentMonth,
+            pendingLeavesCount: pendingLeaves.length
+        };
+    });
 }
+
+onMounted(() => {
+    fetchAllData();
+});
 
 const departments = computed(() => {
     return [...new Set(employees.value.map(emp => emp.department))].sort()
@@ -114,7 +153,6 @@ const totalEmployees = computed(() => employees.value.length)
 
 const overallStats = computed(() => {
     const count = employees.value.length
-    console.log(count)
     if (count === 0) {
         return {
             averageAttendance: 0,
@@ -144,13 +182,11 @@ function getInitials(name) {
 }
 
 function getLeaveStatusClass(emp) {
-    const pendingRequests = emp.leaveRequests?.filter(l => l.status === 'Pending' && l.date.includes('2024'))
-    return pendingRequests?.length > 0 ? 'warning' : 'good'
+    return emp.pendingLeavesCount > 0 ? 'warning' : 'good'
 }
 
 function getLeaveStatusText(emp) {
-    const pendingRequests = emp.leaveRequests?.filter(l => l.status === 'Pending' && l.date.includes('2024'))
-    return pendingRequests?.length > 0 ? 'Pending 2024 requests' : 'Up to date'
+    return emp.pendingLeavesCount > 0 ? `${emp.pendingLeavesCount} pending requests` : 'Up to date'
 }
 
 function getAttendanceStatusClass(emp) {
@@ -163,10 +199,44 @@ function getAttendanceStatus(emp) {
 
 function showDetails(emp) {
     console.log('Showing details for:', emp.name)
+    // You can implement a modal or detailed view here
 }
 
 function scheduleReview(emp) {
     console.log('Scheduling review for:', emp.name)
+    alert(`Performance review scheduled for ${emp.name}`)
+}
+
+function exportPerformanceReport() {
+    const report = {
+        generated: new Date().toISOString(),
+        totalEmployees: totalEmployees.value,
+        overallStats: overallStats.value,
+        employees: employees.value.map(emp => ({
+            name: emp.name,
+            department: emp.department,
+            position: emp.position,
+            attendancePercentage: emp.attendancePercentage,
+            performanceLevel: emp.performanceLevel,
+            evaluationNotes: emp.evaluationNotes
+        }))
+    }
+    
+    const dataStr = JSON.stringify(report, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `performance-report-${new Date().toISOString().slice(0,10)}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+}
+
+// Refresh data function
+const refreshData = async () => {
+    await fetchAllData();
+    alert('Performance data refreshed!');
 }
 </script>
 
@@ -181,167 +251,217 @@ function scheduleReview(emp) {
             </p>
             <div class="evaluation-period">
                 <span class="period-label"> Evaluation Period: </span>
-                <span class="period-value"> July 2025 </span>
+                <span class="period-value"> {{ employees[0]?.recentMonth || 'Current Month' }} </span>
             </div>
-        </div>
-        <div class="summary-stats">
-            <div class="stat-card">
-                <div class="stat-icon"> <i class="bi bi-people-fill"> </i> </div>
-                <div class="stat-content">
-                    <h3> Total Employees </h3>
-                    <div class="stat-value">{{ totalEmployees }} </div>
-                    <div class="stat-label"> Across all departments </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon"> <i class="bi bi-card-checklist"> </i> </div>
-                <div class="stat-content">
-                    <h3> Average Attendance </h3> 
-                    <div class="stat-value">{{ overallStats.value?.averageAttendance }}</div>
-                    <div class="stat-label"> Monthly Average </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon"> <i class="bi bi-award"> </i> </div>
-                <div class="stat-content">
-                    <h3> Top Performers </h3>
-                    <div class="stat-value">{{ overallStats.value?.topPerformersCount }} </div>
-                    <div class="stat-label"> 90%+ Attendance </div>
-                </div>
-            </div>
-            <div class="stat-card warning">
-                <div class="stat-icon"> <i class="bi bi-exclamation-triangle-fill"></i> </div>
-                <div class="stat-content">
-                    <h3> Needs Attention </h3>
-                    <div class="stat-value">{{ overallStats.value?.needsAttentionCount }}</div>
-                    <div class="stat-label"> Requires Follow-up </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="categories-section">
-            <div class="category-tabs">
-                <button @click="setActiveCategory('top')" :class="['tab-btn', { active: activeCategory === 'top' }]">
-                    Top Performers ({{ topPerformers?.length }})
+            
+            <div class="header-actions">
+                <button @click="refreshData" class="refresh-btn">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh Data
                 </button>
-                <button @click="setActiveCategory('average')"
-                    :class="['tab-btn', { active: activeCategory === 'average' }]">
-                    Satisfactory ({{ satisfactoryEmployees?.length }})
-                </button>
-                <button @click="setActiveCategory('needs-attention')"
-                    :class="['tab-btn', { active: activeCategory === 'needs-attention' }, 'warning']">
-                    Needs Attention ({{ needsAttention?.length }})
+                <button @click="exportPerformanceReport" class="export-report-btn">
+                    <i class="bi bi-download"></i> Export Report
                 </button>
             </div>
         </div>
 
-        <div class="performance-details">
-            <div v-if="activeCategory === 'top'" class="category-content">
-                <h3>Top Performers - 90%+ Attendance</h3>
-                <div class="employee-cards">
-                    <div v-for="emp in topPerformers" :key="emp.employeeId" class="employee-card excellent">
-                        <div class="employee-header">
-                            <div class="employee-avatar">{{ getInitials(emp.name) }}</div>
-                            <div class="employee-info">
-                                <h4>{{ emp.name }}</h4>
-                                <p class="employee-position">{{ emp.position }}</p>
-                                <p class="employee-dept">{{ emp.department }}</p>
-                            </div>
-                            <div class="performance-badge">Excellent</div>
-                        </div>
-                        <div class="performance-metrics">
-                            <div class="metric">
-                                <span class="metric-label">Attendance:</span>
-                                <span class="metric-value excellent">{{ emp.attendancePercentage }}%</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Present Days:</span>
-                                <span class="metric-value">{{ emp.presentDays }}/{{ emp.totalDays }}</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Leave Status:</span>
-                                <span :class="['metric-value', getLeaveStatusClass(emp)]">
-                                    {{ getLeaveStatusText(emp) }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="employee-notes">
-                            <p><strong>Evaluation:</strong> {{ emp.evaluationNotes }}</p>
-                            <p><strong>Recommendation:</strong> {{ emp.recommendation }}</p>
-                        </div>
+        <div v-if="isLoading" class="loading-section">
+            <p>Loading performance data...</p>
+        </div>
+
+        <div v-else>
+            <div class="summary-stats">
+                <div class="stat-card">
+                    <div class="stat-icon"> <i class="bi bi-people-fill"> </i> </div>
+                    <div class="stat-content">
+                        <h3> Total Employees </h3>
+                        <div class="stat-value">{{ totalEmployees }} </div>
+                        <div class="stat-label"> Across all departments </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"> <i class="bi bi-card-checklist"> </i> </div>
+                    <div class="stat-content">
+                        <h3> Average Attendance </h3> 
+                        <div class="stat-value">{{ overallStats.averageAttendance }}%</div>
+                        <div class="stat-label"> Monthly Average </div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"> <i class="bi bi-award"> </i> </div>
+                    <div class="stat-content">
+                        <h3> Top Performers </h3>
+                        <div class="stat-value">{{ overallStats.topPerformersCount }} </div>
+                        <div class="stat-label"> 90%+ Attendance </div>
+                    </div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-icon"> <i class="bi bi-exclamation-triangle-fill"></i> </div>
+                    <div class="stat-content">
+                        <h3> Needs Attention </h3>
+                        <div class="stat-value">{{ overallStats.needsAttentionCount }}</div>
+                        <div class="stat-label"> Requires Follow-up </div>
                     </div>
                 </div>
             </div>
 
-            <div v-if="activeCategory === 'average'" class="category-content">
-                <h3>Satisfactory Performance - 80-89% Attendance</h3>
-                <div class="employee-cards">
-                    <div v-for="emp in satisfactoryEmployees" :key="emp.employeeId" class="employee-card good">
-                        <div class="employee-header">
-                            <div class="employee-avatar">{{ getInitials(emp.name) }}</div>
-                            <div class="employee-info">
-                                <h4>{{ emp.name }}</h4>
-                                <p class="employee-position">{{ emp.position }}</p>
-                                <p class="employee-dept">{{ emp.department }}</p>
-                            </div>
-                            <div class="performance-badge"> Good </div>
-                        </div>
-                        <div class="performance-metrics">
-                            <div class="metric">
-                                <span class="metric-label">Attendance:</span>
-                                <span class="metric-value good">{{ emp.attendancePercentage }}%</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Absences:</span>
-                                <span class="metric-value">{{ emp.absences }}</span>
-                            </div>
-                            <div class="metric">
-                                <span class="metric-label">Status:</span>
-                                <span :class="['metric-value', getAttendanceStatusClass(emp)]">
-                                    {{ getAttendanceStatus(emp) }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="employee-actions">
-                            <button @click="showDetails(emp)" class="action-btn">View Details</button>
-                            <button @click="scheduleReview(emp)" class="action-btn secondary">Schedule Review</button>
-                        </div>
-                    </div>
+            <div class="filter-section">
+                <div class="filter-group">
+                    <label for="department-filter">Filter by Department:</label>
+                    <select id="department-filter" v-model="selectedDepartment">
+                        <option value="all">All Departments</option>
+                        <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="performance-filter">Filter by Performance:</label>
+                    <select id="performance-filter" v-model="selectedPerformance">
+                        <option value="all">All Performance Levels</option>
+                        <option value="excellent">Excellent (90%+)</option>
+                        <option value="good">Good (80-89%)</option>
+                        <option value="needs-improvement">Needs Improvement (&lt;80%)</option>
+                    </select>
+                </div>
+                
+                <button @click="selectedDepartment = 'all'; selectedPerformance = 'all'" class="reset-btn">
+                    Reset Filters
+                </button>
+            </div>
+
+            <div class="categories-section">
+                <div class="category-tabs">
+                    <button @click="setActiveCategory('top')" :class="['tab-btn', { active: activeCategory === 'top' }]">
+                        Top Performers ({{ topPerformers?.length || 0 }})
+                    </button>
+                    <button @click="setActiveCategory('average')"
+                        :class="['tab-btn', { active: activeCategory === 'average' }]">
+                        Satisfactory ({{ satisfactoryEmployees?.length || 0 }})
+                    </button>
+                    <button @click="setActiveCategory('needs-attention')"
+                        :class="['tab-btn', { active: activeCategory === 'needs-attention' }, 'warning']">
+                        Needs Attention ({{ needsAttention?.length || 0 }})
+                    </button>
                 </div>
             </div>
 
-            <div v-if="activeCategory === 'needs-attention'" class="category-content">
-                <h3>Requires Attention - Below 80% Attendance</h3>
-                <div class="employee-cards">
-                    <div v-for="emp in needsAttention" :key="emp.employeeId" class="employee-card warning">
-                        <div class="employee-header">
-                            <div class="employee-avatar">{{ getInitials(emp.name) }}</div>
-                            <div class="employee-info">
-                                <h4>{{ emp.name }}</h4>
-                                <p class="employee-position">{{ emp.position }}</p>
-                                <p class="employee-dept">{{ emp.department }}</p>
+            <div class="performance-details">
+                <div v-if="activeCategory === 'top'" class="category-content">
+                    <h3>Top Performers - 90%+ Attendance</h3>
+                    <div v-if="topPerformers.length === 0" class="no-data">
+                        <p>No top performers found with current filters.</p>
+                    </div>
+                    <div v-else class="employee-cards">
+                        <div v-for="emp in topPerformers" :key="emp.employee_id" class="employee-card excellent">
+                            <div class="employee-header">
+                                <div class="employee-avatar">{{ getInitials(emp.name) }}</div>
+                                <div class="employee-info">
+                                    <h4>{{ emp.name }}</h4>
+                                    <p class="employee-position">{{ emp.position }}</p>
+                                    <p class="employee-dept">{{ emp.department }}</p>
+                                </div>
+                                <div class="performance-badge">Excellent</div>
                             </div>
-                            <div class="performance-badge warning">! Needs Attention !</div>
+                            <div class="performance-metrics">
+                                <div class="metric">
+                                    <span class="metric-label">Attendance:</span>
+                                    <span class="metric-value excellent">{{ emp.attendancePercentage }}%</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Present Days:</span>
+                                    <span class="metric-value">{{ emp.presentDays }}/{{ emp.totalDays }}</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Leave Status:</span>
+                                    <span :class="['metric-value', getLeaveStatusClass(emp)]">
+                                        {{ getLeaveStatusText(emp) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="employee-notes">
+                                <p><strong>Evaluation:</strong> {{ emp.evaluationNotes }}</p>
+                                <p><strong>Recommendation:</strong> {{ emp.recommendation }}</p>
+                            </div>
                         </div>
-                        <div class="performance-metrics">
-                            <div class="metric">
-                                <span class="metric-label">Attendance:</span>
-                                <span class="metric-value warning">{{ emp.attendancePercentage }}%</span>
+                    </div>
+                </div>
+
+                <div v-if="activeCategory === 'average'" class="category-content">
+                    <h3>Satisfactory Performance - 80-89% Attendance</h3>
+                    <div v-if="satisfactoryEmployees.length === 0" class="no-data">
+                        <p>No satisfactory performers found with current filters.</p>
+                    </div>
+                    <div v-else class="employee-cards">
+                        <div v-for="emp in satisfactoryEmployees" :key="emp.employee_id" class="employee-card good">
+                            <div class="employee-header">
+                                <div class="employee-avatar">{{ getInitials(emp.name) }}</div>
+                                <div class="employee-info">
+                                    <h4>{{ emp.name }}</h4>
+                                    <p class="employee-position">{{ emp.position }}</p>
+                                    <p class="employee-dept">{{ emp.department }}</p>
+                                </div>
+                                <div class="performance-badge"> Good </div>
                             </div>
-                            <div class="metric">
-                                <span class="metric-label">Absences:</span>
-                                <span class="metric-value">{{ emp.absences }}</span>
+                            <div class="performance-metrics">
+                                <div class="metric">
+                                    <span class="metric-label">Attendance:</span>
+                                    <span class="metric-value good">{{ emp.attendancePercentage }}%</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Absences:</span>
+                                    <span class="metric-value">{{ emp.absences }}</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Status:</span>
+                                    <span :class="['metric-value', getAttendanceStatusClass(emp)]">
+                                        {{ getAttendanceStatus(emp) }}
+                                    </span>
+                                </div>
                             </div>
-                            <div class="metric">
-                                <span class="metric-label">Concerns:</span>
-                                <span class="metric-value warning">{{ emp.concerns.join(', ') }}</span>
+                            <div class="employee-actions">
+                                <button @click="showDetails(emp)" class="action-btn">View Details</button>
+                                <button @click="scheduleReview(emp)" class="action-btn secondary">Schedule Review</button>
                             </div>
                         </div>
-                        <div class="action-required">
-                            <h4>Action Required:</h4>
-                            <ul>
-                                <li v-for="action in emp.actions" :key="action">{{ action }}</li>
-                            </ul>
+                    </div>
+                </div>
+
+                <div v-if="activeCategory === 'needs-attention'" class="category-content">
+                    <h3>Requires Attention - Below 80% Attendance</h3>
+                    <div v-if="needsAttention.length === 0" class="no-data">
+                        <p>No employees needing attention found with current filters.</p>
+                    </div>
+                    <div v-else class="employee-cards">
+                        <div v-for="emp in needsAttention" :key="emp.employee_id" class="employee-card warning">
+                            <div class="employee-header">
+                                <div class="employee-avatar">{{ getInitials(emp.name) }}</div>
+                                <div class="employee-info">
+                                    <h4>{{ emp.name }}</h4>
+                                    <p class="employee-position">{{ emp.position }}</p>
+                                    <p class="employee-dept">{{ emp.department }}</p>
+                                </div>
+                                <div class="performance-badge warning">! Needs Attention !</div>
+                            </div>
+                            <div class="performance-metrics">
+                                <div class="metric">
+                                    <span class="metric-label">Attendance:</span>
+                                    <span class="metric-value warning">{{ emp.attendancePercentage }}%</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Absences:</span>
+                                    <span class="metric-value">{{ emp.absences }}</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Concerns:</span>
+                                    <span class="metric-value warning">{{ emp.concerns.join(', ') || 'None' }}</span>
+                                </div>
+                            </div>
+                            <div class="action-required">
+                                <h4>Action Required:</h4>
+                                <ul>
+                                    <li v-for="action in emp.actions" :key="action">{{ action }}</li>
+                                    <li v-if="emp.actions.length === 0">Monitor performance closely</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -350,8 +470,63 @@ function scheduleReview(emp) {
     </div>
 </template>
 
-
 <style>
+.loading-section {
+    text-align: center;
+    padding: 60px;
+    color: #666;
+    font-size: 1.2rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.refresh-btn, .export-report-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.refresh-btn {
+    background: #3498db;
+    color: white;
+}
+
+.refresh-btn:hover {
+    background: #2980b9;
+}
+
+.export-report-btn {
+    background: #27ae60;
+    color: white;
+}
+
+.export-report-btn:hover {
+    background: #219653;
+}
+
+.no-data {
+    text-align: center;
+    padding: 40px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    color: #666;
+}
+
+.dark-mode .no-data {
+    background: #2d2d2d;
+    color: #ddd;
+}
+
 .performance-evaluation {
     padding: 24px;
     max-width: 1400px;

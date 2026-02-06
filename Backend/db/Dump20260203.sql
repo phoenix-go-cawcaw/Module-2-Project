@@ -59,7 +59,7 @@ CREATE TABLE `employee_info` (
   `employment_history` varchar(100) DEFAULT NULL,
   `contact` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`employee_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -68,7 +68,18 @@ CREATE TABLE `employee_info` (
 
 LOCK TABLES `employee_info` WRITE;
 /*!40000 ALTER TABLE `employee_info` DISABLE KEYS */;
-INSERT INTO `employee_info` VALUES (1,'Sibongile Nkosi','Software Engineer','Development',70000.00,'Joined in 2015, promoted to Senior in 2018','sibongile.nkosi@moderntech.com'),(2,'Lungile Moyo','HR Manager','HR',80000.00,'Joined in 2013,promoted to Manager in 2017','lungile.moyo@moderntech.com'),(3,'Thabo Molefe','Quality Analyst','QA',55000.00,'Joined in 2018','thabo.molefe@moderntech.com'),(4,'Keshav Nadioo','Sales Representative','Sales',60000.00,'Joined in 2020','keshav.naidoo@moderntech.com'),(5,'Zanele Khumalo','Marketing Specialist','Marketing',58000.00,'Joined in 2019','zanele.khumalo@moderntech.com'),(6,'Sipho Zulu','UI/Ux Designer','Design',65000.00,'Joined in 2016','sipho.zulu@moderntech.com'),(7,'Naledi Moeketsi','DevOps Engineer','IT',72000.00,'Joined in 2017','naledi.moeketsi@moderntech.com'),(8,'Farai Gumbo','Content Strategist','Marketing',56000.00,'Joined in 2021','farai.gumbo@moderntech.com'),(9,'Karabo Dlamini','Accountant','Finance',62000.00,'Joined in 2018','karabo.dlamini@moderntech.com'),(10,'Fatima Patel','Customer Support Lead','Support',58000.00,'Joined in 2016','fatima.patel@moderntech.com'), (11, 'John Doe','Software Engineer','Development',70000.00,'Joined in 2015, promoted to Senior in 2018','sibongile.nkosi@moderntech.com');
+INSERT INTO `employee_info` VALUES 
+(1,'Sibongile Nkosi','Software Engineer','Development',70000.00,'Joined in 2015, promoted to Senior in 2018','sibongile.nkosi@moderntech.com'),
+(2,'Lungile Moyo','HR Manager','HR',80000.00,'Joined in 2013, promoted to Manager in 2017','lungile.moyo@moderntech.com'),
+(3,'Thabo Molefe','Quality Analyst','QA',55000.00,'Joined in 2018','thabo.molefe@moderntech.com'),
+(4,'Keshav Naidoo','Sales Representative','Sales',60000.00,'Joined in 2020','keshav.naidoo@moderntech.com'),
+(5,'Zanele Khumalo','Marketing Specialist','Marketing',58000.00,'Joined in 2019','zanele.khumalo@moderntech.com'),
+(6,'Sipho Zulu','UI/UX Designer','Design',65000.00,'Joined in 2016','sipho.zulu@moderntech.com'),
+(7,'Naledi Moeketsi','DevOps Engineer','IT',72000.00,'Joined in 2017','naledi.moeketsi@moderntech.com'),
+(8,'Farai Gumbo','Content Strategist','Marketing',56000.00,'Joined in 2021','farai.gumbo@moderntech.com'),
+(9,'Karabo Dlamini','Accountant','Finance',62000.00,'Joined in 2018','karabo.dlamini@moderntech.com'),
+(10,'Fatima Patel','Customer Support Lead','Support',58000.00,'Joined in 2016','fatima.patel@moderntech.com'),
+(11,'John Doe','Software Engineer','Development',70000.00,'Joined in 2015, promoted to Senior in 2018','john.doe@moderntech.com');
 /*!40000 ALTER TABLE `employee_info` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -97,7 +108,20 @@ CREATE TABLE `leave_requests` (
 
 LOCK TABLES `leave_requests` WRITE;
 /*!40000 ALTER TABLE `leave_requests` DISABLE KEYS */;
-INSERT INTO `leave_requests` VALUES (1,1,'2025-07-22','Sick leave','Approved'),(2,1,'2024-12-01','Personl','Pending'),(3,2,'2025-07-15','Family Responsibility','Denied'),(4,2,'2024-12-02','Vacation','Approved'),(5,3,'2025-07-10','Medical Appointment','Approved'),(6,3,'2024-12-05','Personal','Pending'),(7,4,'2025-07-20','Bereavement','Approved'),(8,5,'2024-12-01','Childcare','Pending'),(9,6,'2025-07-18','Sick Leave','Approved'),(10,7,'2025-07-22','Vacation','Pending'),(11,8,'2024-12-02','Medical Appointment','Approved'),(12,9,'2025-07-19','Childcare','Denied'),(13,10,'2024-12-03','Vacation','Pending');
+INSERT INTO `leave_requests` VALUES 
+(1,1,'2025-07-22','Sick leave','Approved'),
+(2,1,'2024-12-01','Personal','Pending'),
+(3,2,'2025-07-15','Family Responsibility','Denied'),
+(4,2,'2024-12-02','Vacation','Approved'),
+(5,3,'2025-07-10','Medical Appointment','Approved'),
+(6,3,'2024-12-05','Personal','Pending'),
+(7,4,'2025-07-20','Bereavement','Approved'),
+(8,5,'2024-12-01','Childcare','Pending'),
+(9,6,'2025-07-18','Sick Leave','Approved'),
+(10,7,'2025-07-22','Vacation','Pending'),
+(11,8,'2024-12-02','Medical Appointment','Approved'),
+(12,9,'2025-07-19','Childcare','Denied'),
+(13,10,'2024-12-03','Vacation','Pending');
 /*!40000 ALTER TABLE `leave_requests` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -117,7 +141,7 @@ CREATE TABLE `payroll` (
   PRIMARY KEY (`id`),
   KEY `employee_id` (`employee_id`),
   CONSTRAINT `payroll_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employee_info` (`employee_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -126,7 +150,17 @@ CREATE TABLE `payroll` (
 
 LOCK TABLES `payroll` WRITE;
 /*!40000 ALTER TABLE `payroll` DISABLE KEYS */;
-INSERT INTO `payroll` VALUES (1,1,160,8,69500.00),(2,2,150,10,79000.00),(3,3,170,4,54800.00),(4,4,165,6,59700.00),(5,5,158,5,57850.00),(6,6,168,2,64800.00),(7,7,175,3,71800.00),(8,8,160,0,56000.00),(9,9,155,5,61500.00),(10,10,162,4,57750.00);
+INSERT INTO `payroll` VALUES 
+(1,1,160,8,69500.00),
+(2,2,150,10,79000.00),
+(3,3,170,4,54800.00),
+(4,4,165,6,59700.00),
+(5,5,158,5,57850.00),
+(6,6,168,2,64800.00),
+(7,7,175,3,71800.00),
+(8,8,160,0,56000.00),
+(9,9,155,5,61500.00),
+(10,10,162,4,57750.00);
 /*!40000 ALTER TABLE `payroll` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

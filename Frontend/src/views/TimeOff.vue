@@ -1,3 +1,141 @@
+<script>
+import axios from 'axios';
+
+const API_BASE = 'http://localhost:5000/api';
+
+export default {
+    name: 'TimeOff',
+    data() {
+        return {
+            activeTab: 'requests',
+            leaveRequests: [],
+            editingRequest: null,
+            isLoading: false
+        }
+    },
+
+    computed: {
+        pendingCount() {
+            return this.leaveRequests.filter(req => req.status === 'Pending').length;
+        },
+
+        approvedCount() {
+            return this.leaveRequests.filter(req => req.status === 'Approved').length;
+        },
+
+        deniedCount() {
+            return this.leaveRequests.filter(req => req.status === 'Denied').length;
+        }
+    },
+
+    created() {
+        this.fetchLeaveRequests();
+    },
+
+    methods: {
+        async fetchLeaveRequests() {
+            try {
+                this.isLoading = true;
+                const res = await axios.get(`${API_BASE}/leave_requests`);
+                this.leaveRequests = res.data.map(request => ({
+                    id: request.leave_id,
+                    employeeId: request.employee_id,
+                    employeeName: `Employee ${request.employee_id}`, // You might want to fetch employee names separately
+                    startDate: this.formatDate(request.start_date),
+                    endDate: this.formatDate(request.end_date),
+                    reason: request.reason || 'No reason provided',
+                    status: request.status || 'Pending',
+                    submittedDate: this.formatDate(request.created_at || new Date().toISOString())
+                }));
+            } catch (err) {
+                console.error('Failed to fetch leave requests:', err);
+                alert('Failed to load leave requests.');
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        formatDate(dateString) {
+            try {
+                if (!dateString) return 'No date';
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) {
+                    return dateString;
+                }
+                return date.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            } catch (error) {
+                console.error('Error formatting date:', dateString, error);
+                return dateString;
+            }
+        },
+
+        async updateStatus(requestId, newStatus) {
+            try {
+                const request = this.leaveRequests.find(r => r.id === requestId);
+                if (!request) return;
+
+                const payload = {
+                    employee_id: request.employeeId,
+                    start_date: request.startDate,
+                    end_date: request.endDate,
+                    reason: request.reason,
+                    status: newStatus
+                };
+
+                await axios.put(`${API_BASE}/leave_requests/${requestId}`, payload);
+
+                // Update local state
+                request.status = newStatus;
+                alert(`Request ${newStatus.toLowerCase()} successfully!`);
+            } catch (err) {
+                console.error('Failed to update status:', err);
+                alert('Failed to update request status.');
+            }
+        },
+
+        startEdit(request) {
+            this.editingRequest = { ...request };
+        },
+
+        async saveEdit() {
+            try {
+                const payload = {
+                    employee_id: this.editingRequest.employeeId,
+                    start_date: this.editingRequest.startDate,
+                    end_date: this.editingRequest.endDate,
+                    reason: this.editingRequest.reason,
+                    status: this.editingRequest.status
+                };
+
+                await axios.put(`${API_BASE}/leave_requests/${this.editingRequest.id}`, payload);
+
+                // Update local state
+                const index = this.leaveRequests.findIndex(
+                    r => r.id === this.editingRequest.id
+                );
+                if (index !== -1) {
+                    this.leaveRequests[index] = { ...this.editingRequest };
+                }
+
+                this.editingRequest = null;
+                alert('Request updated successfully!');
+            } catch (err) {
+                console.error('Failed to update request:', err);
+                alert('Failed to update request.');
+            }
+        },
+
+        cancelEdit() {
+            this.editingRequest = null;
+        }
+    }
+}
+</script>
+
 <template>
     <div class="timeoff-page">
         <div class="page-header">
@@ -51,8 +189,8 @@
                         <p><strong>Reason:</strong> {{ request.reason }}</p>
                     </div>
                     <div class="request-actions">
-                        <button class="btn-approve" @click="updateStatus(request.id,'Approved')">Approve</button>
-                        <button class="btn-deny" @click="updateStatus(request.id,'Denied')">Deny</button>
+                        <button class="btn-approve" @click="updateStatus(request.id, 'Approved')">Approve</button>
+                        <button class="btn-deny" @click="updateStatus(request.id, 'Denied')">Deny</button>
                         <button class="btn-edit" @click="startEdit(request)">Edit</button>
                     </div>
                 </div>
@@ -79,7 +217,7 @@
         <div v-if="editingRequest" class="edit-modal">
             <div class="edit-card">
                 <h3>Edit leave Request</h3>
-                
+
                 <div class="form-group">
                     <label>Type</label>
                     <input v-model="editingRequest.type">
@@ -106,134 +244,8 @@
             </div>
         </div>
     </div>
-    
+
 </template>
-
-<script>
-import employeesData from '@/stores/employee_info.json'
-import attendanceData from '@/stores/attendance.json'
-
-export default {
-    name: 'TimeOff',
-    data() {
-        return {
-            activeTab: 'requests',
-            employees: [],
-            leaveRequests: [],
-            editingRequest: null
-        }
-    },
-
-    computed: {
-        pendingCount() {
-            return this.leaveRequests.filter(req => req.status === 'Pending').length;
-        },
-
-        approvedCount() {
-            return this.leaveRequests.filter(req => req.status === 'Approved').length;
-        },
-
-        deniedCount() {
-            return this.leaveRequests.filter(req => req.status === 'Denied').length;
-        }
-    },
-
-    created() {
-        this.employees = employeesData;
-        this.transformAttendanceData();
-
-        console.log('Employees loaded:', this.employees.length);
-        console.log('Time-off requests loaded:', this.leaveRequests.length);
-    },
-
-    methods: {
-        transformAttendanceData() {
-            this.leaveRequests = [];
-
-            if (!attendanceData || !attendanceData.attendanceAndLeave) {
-                console.error('No attendance data found or incorrect structure');
-                console.log('Attendance data:', attendanceData);
-                return;
-            }
-
-            let requestId = 1;
-
-            attendanceData.attendanceAndLeave.forEach(employee => {
-                if (employee.leaveRequests && Array.isArray(employee.leaveRequests)) {
-                    employee.leaveRequests.forEach(leave => {
-                        const transformedRequest = {
-                            id: requestId++,
-                            employeeId: employee.employeeId || employee.id,
-                            employeeName: employee.name || employee.employeeName || 'Unknown',
-                            startDate: this.formatDate(leave.date),
-                            endDate: this.formatDate(leave.date),
-                            duration: leave.duration || 1,
-                            type: leave.type || leave.reason || 'Unknown',
-                            reason: leave.reason || leave.type || 'No reason provided',
-                            status: leave.status || 'Pending',
-                            submittedDate: this.formatDate(leave.submittedDate || leave.date),
-                            originalDate: leave.date
-                        };
-                        this.leaveRequests.push(transformedRequest);
-                    });
-                }
-            });
-
-            console.log('Transformed leave requests:', this.leaveRequests);
-        },
-
-        formatDate(dateString) {
-            try {
-                if (!dateString) return 'No date';
-
-                const date = new Date(dateString);
-                if (isNaN(date.getTime())) {
-                    return dateString;
-                }
-
-                return date.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                });
-            } catch (error) {
-                console.error('Error formatting date:', dateString, error);
-                return dateString;
-            }
-        },
-        updateStatus(requestId, newStatus){
-            const request = this.leaveRequests.find(r => r.id === requestId);
-            if(!request) return;
-
-            request.status = newStatus;
-
-            console.log('Status updated',requestId, newStatus);
-        },
-
-        startEdit(request){
-            this.editingRequest = {...request};
-        },
-
-        saveEdit(){
-            const index = this.leaveRequests.findIndex(
-                r => r.id === this.editingRequest.id
-            );
-
-            if(index !== -1){
-                this.leaveRequests[index] = {...this.editingRequest};
-
-                console.log('Request updated', this.editingRequest);
-            }
-            this.editingRequest = null;
-        },
-        cancelEdit(){
-            this.editingRequest = null;
-        }
-
-
-    }
-}
-</script>
 
 <style scoped>
 .timeoff-page {
@@ -595,43 +607,45 @@ export default {
     }
 }
 
-.edit-modal{
+.edit-modal {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.45);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index:1000;
+    z-index: 1000;
 }
 
-.edit-card{
+.edit-card {
     background: white;
     padding: 24px;
     border-radius: 12px;
     width: 100%;
     max-width: 380px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-} 
+}
 
-.edit-card h3{
+.edit-card h3 {
     margin-bottom: 20px;
     text-align: center;
 }
-.form-group{
+
+.form-group {
     display: flex;
     flex-direction: colomn;
     gap: 6px;
     margin-bottom: 15px;
 }
 
-.form-group label{
+.form-group label {
     font-size: 0.85rem;
     font-weight: 600;
     color: #555;
 }
 
-.form-group input, .form-group select{
+.form-group input,
+.form-group select {
     padding: 8px 10px;
     border-radius: 6px;
     border: 1px solid #ccc;
@@ -639,15 +653,15 @@ export default {
     width: 100%;
 }
 
-.modal-actions{
+.modal-actions {
     display: flex;
     justify-content: center;
     gap: 10px;
     margin-top: 20px;
 }
 
-.save-btn{
-    background:#3498db;
+.save-btn {
+    background: #3498db;
     color: white;
     border: none;
     padding: 8px 16px;
@@ -655,7 +669,7 @@ export default {
     cursor: pointer;
 }
 
-.cancel-btn{
+.cancel-btn {
     background: #bdc3c7;
     color: #2c3e50;
     border: none;
@@ -664,21 +678,23 @@ export default {
     cursor: pointer;
 }
 
-.btn-approve,.btn-deny,.btn-edit{
+.btn-approve,
+.btn-deny,
+.btn-edit {
     background: #3498db;
     color: white;
     border: 1px solid #3498db;
     padding: 5px 12px;
     border-radius: 20px;
     font-weight: bold;
-    
+
 }
 
-.request-actions{
+.request-actions {
     display: flex;
     gap: 10px;
     font-size: 0.85rem;
     font-weight: 600;
-   
+
 }
 </style>

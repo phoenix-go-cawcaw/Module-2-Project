@@ -142,7 +142,7 @@
                                     </div>
                                     <span>
                                         {{Math.round(Object.values(employee.attendanceMap).filter(s => s ===
-                                            'Present').length / displayedDates.length * 100) }}%
+                                            'Present').length / displayedDates.length * 100)}}%
                                     </span>
                                 </div>
                             </td>
@@ -186,6 +186,7 @@ export default {
         const todayString = new Date().toISOString().slice(0, 10)
 
         const attendanceRecords = ref([])
+        const employees = ref([]) // Add employees data
         const selectedMonth = ref(new Date().toISOString().slice(0, 7))
         const selectedStatus = ref('all')
 
@@ -196,57 +197,93 @@ export default {
 
         onMounted(async () => {
             try {
-                const res = await axios.get(`${API_BASE}/attendance`)
-                attendanceRecords.value = res.data || []
+                // Fetch both employees and attendance data
+                const [employeesRes, attendanceRes] = await Promise.all([
+                    axios.get(`${API_BASE}/employees`),
+                    axios.get(`${API_BASE}/attendance`)
+                ])
+
+                employees.value = employeesRes.data || []
+                attendanceRecords.value = attendanceRes.data || []
+
+                console.log('Employees loaded:', employees.value.length)
+                console.log('Attendance records loaded:', attendanceRecords.value.length)
+                console.log('Sample attendance record:', attendanceRecords.value[0])
             } catch (err) {
-                console.error('Failed to fetch attendance:', err)
+                console.error('Failed to fetch data:', err)
+                alert('Failed to load attendance data. Please check backend connection.')
             }
         })
 
-        const monthlyAttendance = computed(() => {
+        // Transform flat attendance records into employee-based structure
+        const transformedAttendance = computed(() => {
+            if (!employees.value.length || !attendanceRecords.value.length) return []
+
             const [year, month] = selectedMonth.value.split('-').map(Number)
-            return attendanceRecords.value.map(emp => {
-                const daysInMonth = new Date(year, month, 0).getDate()
+            const daysInMonth = new Date(year, month, 0).getDate()
+
+            return employees.value.map(emp => {
+                // Filter attendance records for this employee and selected month
+                const employeeAttendance = attendanceRecords.value.filter(record =>
+                    record.employee_id === emp.employee_id &&
+                    record.date &&
+                    record.date.startsWith(selectedMonth.value)
+                )
+
+                // Create attendance map for the month
                 const attendanceMap = {}
                 for (let day = 1; day <= daysInMonth; day++) {
                     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-                    const record = emp.attendance.find(a => a.date === dateStr)
+                    const record = employeeAttendance.find(a => a.date === dateStr)
                     attendanceMap[dateStr] = record ? record.status : 'Not Recorded'
                 }
+
                 return {
                     ...emp,
+                    employeeId: emp.employee_id, // Ensure employeeId is set
+                    name: emp.name,
+                    attendance: employeeAttendance,
                     attendanceMap
                 }
             })
         })
 
-        const totalEmployees = computed(() => monthlyAttendance.value.length)
+        const monthlyAttendance = computed(() => {
+            return transformedAttendance.value
+        })
+
+        const totalEmployees = computed(() => {
+            return transformedAttendance.value.length
+        })
 
         const averageAttendance = computed(() => {
             if (!monthlyAttendance.value.length) return 0
+
             let totalDays = 0
             let presentDays = 0
+
             monthlyAttendance.value.forEach(emp => {
                 const days = Object.values(emp.attendanceMap)
                 totalDays += days.length
                 presentDays += days.filter(s => s === 'Present').length
             })
+
             return totalDays ? Math.round((presentDays / totalDays) * 100) : 0
         })
 
-        const totalAbsences = computed(() =>
-            monthlyAttendance.value.reduce(
+        const totalAbsences = computed(() => {
+            return monthlyAttendance.value.reduce(
                 (sum, emp) => sum + Object.values(emp.attendanceMap).filter(s => s === 'Absent').length,
                 0
             )
-        )
+        })
 
-        const totalOnLeave = computed(() =>
-            monthlyAttendance.value.reduce(
+        const totalOnLeave = computed(() => {
+            return monthlyAttendance.value.reduce(
                 (sum, emp) => sum + Object.values(emp.attendanceMap).filter(s => s === 'On Leave').length,
                 0
             )
-        )
+        })
 
         const currentMonthName = computed(() => {
             return new Date(selectedMonth.value + '-01').toLocaleDateString('en-US', {
@@ -286,19 +323,35 @@ export default {
             monthlyAttendance.value.forEach(emp => {
                 const status = emp.attendanceMap[date]
                 if (status && status !== 'Not Recorded') {
-                    records.push({ employeeId: emp.employeeId, name: emp.name, status })
+                    records.push({
+                        employeeId: emp.employee_id || emp.employeeId,
+                        name: emp.name,
+                        status
+                    })
                 }
             })
             return records.slice(0, 20)
         }
 
         const getStatusClass = status => {
-            const map = { Present: 'present', Absent: 'absent', Late: 'late', 'On Leave': 'leave', 'Not Recorded': 'not-recorded' }
+            const map = {
+                Present: 'present',
+                Absent: 'absent',
+                Late: 'late',
+                'On Leave': 'leave',
+                'Not Recorded': 'not-recorded'
+            }
             return map[status] || 'not-recorded'
         }
 
         const getStatusInitial = status => {
-            const map = { Present: 'P', Absent: 'A', Late: 'L', 'On Leave': 'LV', 'Not Recorded': '-' }
+            const map = {
+                Present: 'P',
+                Absent: 'A',
+                Late: 'L',
+                'On Leave': 'LV',
+                'Not Recorded': '-'
+            }
             return map[status] || '-'
         }
 
@@ -325,13 +378,26 @@ export default {
         }
 
         const openEditModal = (employeeId, date) => {
-            const employee = attendanceRecords.value.find(e => e.employeeId === employeeId)
+            // Find employee from both sources
+            const employee = employees.value.find(e =>
+                e.employee_id === employeeId || e.employeeId === employeeId
+            )
+
+            if (!employee) {
+                alert('Employee not found')
+                return
+            }
+
             selectedEmployee.value = employee
             selectedDate.value = date
 
-            const record = employee.attendance.find(a => a.date === date)
-            editStatus.value = record ? record.status : 'Present'
+            // Find attendance record for this date
+            const record = attendanceRecords.value.find(a =>
+                (a.employee_id === employee.employee_id || a.employeeId === employee.employee_id) &&
+                a.date === date
+            )
 
+            editStatus.value = record ? record.status : 'Present'
             showEditModal.value = true
         }
 
@@ -342,29 +408,43 @@ export default {
         }
 
         const saveEdit = async () => {
-            if (!selectedEmployee.value || !selectedDate.value) return
-
-            const recordIndex = selectedEmployee.value.attendance.findIndex(a => a.date === selectedDate.value)
-
-            const payload = {
-                employeeId: selectedEmployee.value.employeeId,
-                date: selectedDate.value,
-                status: editStatus.value
-            }
+            if (!selectedEmployee.value || !selectedDate.value) return;
 
             try {
-                if (recordIndex > -1) {
-                    await axios.put(`${API_BASE}/attendance/${selectedEmployee.value.employeeId}/${selectedDate.value}`, payload)
-                    selectedEmployee.value.attendance[recordIndex].status = editStatus.value
+                const payload = {
+                    employee_id: selectedEmployee.value.employee_id || selectedEmployee.value.employeeId,
+                    date: selectedDate.value,
+                    status: editStatus.value
+                };
+
+                // Check if record already exists
+                const existingRecord = attendanceRecords.value.find(a =>
+                    (a.employee_id === payload.employee_id || a.employeeId === payload.employee_id) &&
+                    a.date === payload.date
+                );
+
+                if (existingRecord && existingRecord.attendance_id) {
+                    // Update existing
+                    await axios.put(`${API_BASE}/attendance/${existingRecord.attendance_id}`, payload);
                 } else {
-                    await axios.post(`${API_BASE}/attendance`, payload)
-                    selectedEmployee.value.attendance.push(payload)
+                    // Create new
+                    await axios.post(`${API_BASE}/attendance`, payload);
                 }
 
-                closeEditModal()
+                // Refresh data
+                const [employeesRes, attendanceRes] = await Promise.all([
+                    axios.get(`${API_BASE}/employees`),
+                    axios.get(`${API_BASE}/attendance`)
+                ]);
+
+                employees.value = employeesRes.data || [];
+                attendanceRecords.value = attendanceRes.data || [];
+
+                closeEditModal();
+                alert('Attendance updated successfully!');
             } catch (err) {
-                console.error('Failed to save attendance:', err)
-                alert('Could not save attendance. Please try again.')
+                console.error('Failed to save attendance:', err);
+                alert('Could not save attendance. Please try again.');
             }
         }
 

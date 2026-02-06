@@ -1,8 +1,9 @@
 <script>
 import { ref, computed, onMounted } from 'vue'
-import employeesData from '@/stores/employee_info.json'
-import payslipsData from '@/stores/payroll_data.json'
-import jsPDF from 'jspdf';
+import axios from 'axios'
+import jsPDF from 'jspdf'
+
+const API_BASE = 'http://localhost:5000/api'
 
 export default {
     name: 'PayrollView',
@@ -10,10 +11,31 @@ export default {
         const search = ref("")
         const selectedEmployee = ref(null)
         const employees = ref([])
-        const payslips = ref([])
+        const payrolls = ref([])
+        const isLoading = ref(false)
+        const selectedMonth = ref(new Date().toISOString().slice(0, 7))
+
+        const fetchEmployees = async () => {
+            try {
+                const res = await axios.get(`${API_BASE}/employees`)
+                employees.value = res.data || []
+            } catch (err) {
+                console.error('Failed to fetch employees:', err)
+                alert('Failed to load employees from backend.')
+            }
+        }
+
+        const fetchPayrolls = async () => {
+            try {
+                const res = await axios.get(`${API_BASE}/payroll`)
+                payrolls.value = res.data || []
+            } catch (err) {
+                console.error('Failed to fetch payrolls:', err)
+                alert('Failed to load payroll data.')
+            }
+        }
 
         const filteredEmployees = computed(() => {
-            
             if (!search.value) return employees.value
             
             return employees.value.filter(emp =>
@@ -22,26 +44,108 @@ export default {
         })
 
         function selectEmployee(emp) {
-            console.log(payslips.value.payrollData);
-            console.log(emp);
+            const employeePayrolls = payrolls.value.filter(p => p.employee_id === emp.employee_id)
             
-            const employeePayslips = payslips.value.filter(p => p.employeeId === emp.employeeId)
+            // Format payroll data for display
+            const formattedPayrolls = employeePayrolls.map(p => ({
+                id: p.id,
+                employeeId: p.employee_id,
+                month: new Date(p.created_at || new Date()).toLocaleDateString('en-US', { 
+                    month: 'long', 
+                    year: 'numeric' 
+                }),
+                hoursWorked: p.hours_worked || 160,
+                leaveDeductions: p.leave_deductions || 0,
+                finalSalary: p.final_salary || emp.salary || 0,
+                created_at: p.created_at
+            }))
+            
             selectedEmployee.value = {
                 ...emp,
-                payslips: employeePayslips
+                payslips: formattedPayrolls
             }
             search.value = ""
         }
 
-        function clearSelection(){
+        function clearSelection() {
             selectedEmployee.value = null
             search.value = ""
         }
 
-        function generatePayslip(slip){
+        async function addNewPayroll() {
+            if (!selectedEmployee.value) return
+            
+            try {
+                const monthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                
+                const payload = {
+                    employee_id: selectedEmployee.value.employee_id,
+                    hours_worked: 160, // Default hours
+                    leave_deductions: 0,
+                    final_salary: selectedEmployee.value.salary || 0,
+                    month: monthName
+                }
+                
+                const res = await axios.post(`${API_BASE}/payroll`, payload)
+                
+                // Refresh payroll data
+                await fetchPayrolls()
+                
+                // Update selected employee
+                selectEmployee(selectedEmployee.value)
+                
+                alert('Payroll entry added successfully!')
+            } catch (err) {
+                console.error('Failed to add payroll:', err)
+                alert('Failed to add payroll entry.')
+            }
+        }
+
+        async function updatePayroll(payrollId, updates) {
+            try {
+                const payload = {
+                    employee_id: selectedEmployee.value.employee_id,
+                    ...updates
+                }
+                
+                await axios.put(`${API_BASE}/payroll/${payrollId}/${selectedEmployee.value.employee_id}`, payload)
+                
+                // Refresh payroll data
+                await fetchPayrolls()
+                
+                // Update selected employee
+                selectEmployee(selectedEmployee.value)
+                
+                alert('Payroll updated successfully!')
+            } catch (err) {
+                console.error('Failed to update payroll:', err)
+                alert('Failed to update payroll.')
+            }
+        }
+
+        async function deletePayroll(payrollId) {
+            if (!confirm('Are you sure you want to delete this payroll entry?')) return
+            
+            try {
+                await axios.delete(`${API_BASE}/payroll/${payrollId}`)
+                
+                // Refresh payroll data
+                await fetchPayrolls()
+                
+                // Update selected employee
+                selectEmployee(selectedEmployee.value)
+                
+                alert('Payroll entry deleted successfully!')
+            } catch (err) {
+                console.error('Failed to delete payroll:', err)
+                alert('Failed to delete payroll entry.')
+            }
+        }
+
+        function generatePayslip(slip) {
             const employee = selectedEmployee.value
 
-            const doc =  new jsPDF({
+            const doc = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
@@ -54,20 +158,13 @@ export default {
                 creator: 'HR Payroll System'
             })
 
-            const primaryColor = '#2c3e50'
-            const accentColor = '#3498db'
-            const sucessColor = '#27ae60'
-
-            // doc.setFillColor(44, 62, 80)
-            // doc.rect(0, 0, 210, 25, 'F')
-
             doc.setTextColor(44, 62, 80)
             doc.setFontSize(20)
             doc.setFont('helvetica', 'bold')
-            doc.text('ModernTech Solutions', 110, 20, {align: 'center'})
+            doc.text('ModernTech Solutions', 110, 20, { align: 'center' })
 
             doc.setFontSize(14)
-            doc.text('Monthly Payslip', 110, 27, {align: 'center'})
+            doc.text('Monthly Payslip', 110, 27, { align: 'center' })
 
             doc.setTextColor(0, 0, 0)
 
@@ -78,7 +175,7 @@ export default {
 
             doc.setDrawColor(52, 152, 219)
             doc.setLineWidth(0.5)
-            doc.line(20,42,190,42)
+            doc.line(20, 42, 190, 42)
 
             doc.setFontSize(11)
             doc.setFont('helvetica', 'bold')
@@ -90,7 +187,7 @@ export default {
 
             doc.setFont('helvetica', 'normal')
             doc.text(String(employee.name), 60, 50)
-            doc.text(String(employee.employeeId), 60, 56)
+            doc.text(String(employee.employee_id), 60, 56)
             doc.text(String(employee.position), 60, 62)
             doc.text(String(employee.department || 'N/A'), 60, 68)
             doc.text(String(slip.month), 60, 74)
@@ -112,13 +209,13 @@ export default {
             doc.text('Hourly Rate', col1X, startY + 6)
             doc.text('Gross Salary', col1X, startY + 12)
             doc.text('Leave Deductions', col1X, startY + 18)
-            
+
             const hourlyRate = slip.finalSalary / slip.hoursWorked
             const grossSalary = slip.hoursWorked * hourlyRate
             doc.text(String(slip.hoursWorked), col2X, startY)
-            doc.text(`R${hourlyRate.toFixed(2)}`, col2X, startY +6)
-            doc.text(`R${grossSalary.toFixed(2)}`, col2X, startY +12)
-            doc.text(`R${(slip.leaveDeductions || 0).toFixed(2)}`, col2X, startY +18)
+            doc.text(`R${hourlyRate.toFixed(2)}`, col2X, startY + 6)
+            doc.text(`R${grossSalary.toFixed(2)}`, col2X, startY + 12)
+            doc.text(`R${(slip.leaveDeductions || 0).toFixed(2)}`, col2X, startY + 18)
 
             const netSalaryY = startY + 30
             doc.setFillColor(39, 174, 96)
@@ -127,27 +224,26 @@ export default {
             doc.setFontSize(10)
             doc.setFont('helvetica', 'bold')
             doc.setTextColor(255, 255, 255)
-            doc.text('NET SALARY PAYABLE', 105, netSalaryY +7, {align: 'center'})
+            doc.text('NET SALARY PAYABLE', 105, netSalaryY + 7, { align: 'center' })
 
             doc.setFontSize(16)
-            doc.text(`R ${slip.finalSalary.toFixed(2)}`, 105, netSalaryY + 13, {align: 'center'})
+            doc.text(`R ${slip.finalSalary.toFixed(2)}`, 105, netSalaryY + 13, { align: 'center' })
 
             const summaryY = netSalaryY + 25
 
             doc.setFillColor(248, 249, 250)
             doc.roundedRect(20, summaryY, 170, 25, 3, 3, 'F')
-    
+
             doc.setFontSize(12)
             doc.setFont('helvetica', 'bold')
             doc.setTextColor(44, 62, 80)
-            doc.text('Payment Summary', 105, summaryY + 8, {align: 'center'})
-    
+            doc.text('Payment Summary', 105, summaryY + 8, { align: 'center' })
+
             doc.setFontSize(10)
             doc.setFont('helvetica', 'normal')
             doc.setTextColor(100, 100, 100)
-            doc.text('Payment Method: Electronic Transfer', 105, summaryY + 16,{align: 'center'})
-            doc.text('Payment Date: Last working day of the month', 105, summaryY + 22,{align: 'center'})
-
+            doc.text('Payment Method: Electronic Transfer', 105, summaryY + 16, { align: 'center' })
+            doc.text('Payment Date: Last working day of the month', 105, summaryY + 22, { align: 'center' })
 
             const footerY = 250
 
@@ -158,36 +254,41 @@ export default {
             doc.setFont('helvetica', 'italic')
             doc.setTextColor(100, 100, 100)
             doc.text(`Generated: ${new Date().toLocaleString()}`, 20, footerY + 5)
-            doc.text('This is an official payslip from ModernTech Solutions', 105, footerY + 5, {align: 'center'})
-            // doc.text('Confidential Document', 190, footerY + 5, {align: 'right'})
+            doc.text('This is an official payslip from ModernTech Solutions', 105, footerY + 5, { align: 'center' })
 
             doc.setFontSize(8)
-            doc.text('HR Department: hr@moderntechsolutions.co.za | Tel: (011) 123-4567', 105, footerY + 12,{align: 'center'})
+            doc.text('HR Department: hr@moderntechsolutions.co.za | Tel: (011) 123-4567', 105, footerY + 12, { align: 'center' })
 
             doc.setDrawColor(220, 220, 220)
             doc.rect(10, 10, 190, 277)
-        //  -${slip.month.replace(/\s+/g,'-')
-            const fileName = 'payslip'
-            doc.save(`${fileName}.pdf`)
 
+            const fileName = `payslip-${employee.name.toLowerCase().replace(/\s+/g, '-')}-${slip.month.toLowerCase().replace(/\s+/g, '-')}`
+            doc.save(`${fileName}.pdf`)
         }
 
-        onMounted(() => {
-            employees.value = Array.isArray(employeesData) ? employeesData:
-                              employeesData.employeeInformation || employeesData.employees || []
-            payslips.value = Array.isArray(payslipsData) ? payslipsData:
-                             payslipsData.payrollData || payslipsData.payslips || []
-            
-            console.log('Employees loaded:', employees.value.length)
-            console.log('Payslips loaded:', payslips.value.length)
+        onMounted(async () => {
+            isLoading.value = true
+            try {
+                await Promise.all([fetchEmployees(), fetchPayrolls()])
+            } catch (err) {
+                console.error('Failed to load data:', err)
+            } finally {
+                isLoading.value = false
+            }
         })
+
         return {
             search,
             selectedEmployee,
             filteredEmployees,
             selectEmployee,
             clearSelection,
-            generatePayslip
+            generatePayslip,
+            addNewPayroll,
+            updatePayroll,
+            deletePayroll,
+            isLoading,
+            selectedMonth
         }
     }
 }
@@ -196,24 +297,23 @@ export default {
 <template>
     <div class="payroll-container">
         <h1 class="page-title">Payroll Management</h1>
-        
+
         <div class="search-container">
-            <input 
-                v-model="search" 
-                class="search-input" 
-                placeholder="Search employees by name..."
-                :disabled="selectedEmployee !== null"
-            >
+            <input v-model="search" class="search-input" placeholder="Search employees by name..."
+                :disabled="selectedEmployee !== null">
         </div>
 
-        <div v-if="filteredEmployees.length > 0 && !selectedEmployee" class="employee-list-container"> 
-        <!-- <div v-if="true" class="employee-list-container"> -->
+        <div v-if="isLoading" class="loading">Loading payroll data...</div>
+
+        <div v-if="filteredEmployees.length > 0 && !selectedEmployee" class="employee-list-container">
             <h3 class="search-title">Search Results:</h3>
             <ul class="employee-list">
-                <li v-for="(emp,i) in filteredEmployees" :key="emp.employeeId ||i" class="emp-item" @click="selectEmployee(emp)">
+                <li v-for="(emp, i) in filteredEmployees" :key="emp.employee_id || i" class="emp-item"
+                    @click="selectEmployee(emp)">
                     <div class="emp-info">
                         <span class="emp-name">{{ emp.name }}</span>
                         <span class="emp-position">{{ emp.position }}</span>
+                        <span class="emp-salary">Salary: R{{ emp.salary?.toLocaleString() || '0' }}</span>
                     </div>
                     <span class="emp-arrow">→</span>
                 </li>
@@ -227,32 +327,47 @@ export default {
         <div v-if="selectedEmployee" class="employee-card">
             <div class="employee-card-header">
                 <button @click="clearSelection" class="back-btn">← Back to search</button>
+                <button @click="addNewPayroll" class="add-payroll-btn">+ Add Payroll Entry</button>
             </div>
-            
+
             <div class="employee-header">
                 <h2>{{ selectedEmployee.name }}</h2>
-                <p class="employee-position">{{ selectedEmployee.position }}</p>
-                <p class="employee-id">ID: {{ selectedEmployee.employeeId }}</p>
+                <p class="employee-position">{{ selectedEmployee.position }} - {{ selectedEmployee.department }}</p>
+                <p class="employee-id">ID: {{ selectedEmployee.employee_id }} | Base Salary: R{{
+                    selectedEmployee.salary?.toLocaleString() || '0' }}</p>
             </div>
 
-            <h3 class="payslips-title">Payslips ({{ selectedEmployee.payslips.length }})</h3>
-            
-            <div v-if="selectedEmployee.payslips.length > 0" class="payslips-grid">
-                <div v-for="slip in selectedEmployee.payslips" :key="`${slip.month} + ${slip.employeeId}`" class="payslip-card">
+            <h3 class="payslips-title">Payslips ({{ selectedEmployee.payslips?.length || 0 }})</h3>
+
+            <div v-if="selectedEmployee.payslips?.length > 0" class="payslips-grid">
+                <div v-for="slip in selectedEmployee.payslips" :key="slip.id" class="payslip-card">
                     <div class="payslip-header">
                         <strong class="month">{{ slip.month }}</strong>
-                        <span class="salary">R{{ (slip.finalSalary).toLocaleString() }}</span>
+                        <span class="salary">R{{ slip.finalSalary.toLocaleString() }}</span>
                     </div>
 
-                    <button @click="generatePayslip(slip)" class="generate-btn">Download PDF</button>
+                    <div class="payslip-actions">
+                        <button @click="generatePayslip(slip)" class="generate-btn">Download PDF</button>
+                        <button @click="deletePayroll(slip.id)" class="delete-btn">Delete</button>
+                    </div>
+
                     <div class="payslip-details">
                         <div class="detail-row">
                             <span>Hours Worked:</span>
-                            <span class="value">{{ slip.hoursWorked }}</span>
+                            <input :value="slip.hoursWorked" @change="e => updatePayroll(slip.id, { hours_worked: e.target.value })"
+                                class="editable-field">
                         </div>
                         <div class="detail-row">
                             <span>Leave Deductions:</span>
-                            <span class="value deduction">R{{ slip.leaveDeductions.toLocaleString() }}</span>
+                            <input :value="slip.leaveDeductions"
+                                @change="e => updatePayroll(slip.id, { leave_deductions: e.target.value })"
+                                class="editable-field">
+                        </div>
+                        <div class="detail-row">
+                            <span>Final Salary:</span>
+                            <input :value="slip.finalSalary"
+                                @change="e => updatePayroll(slip.id, { final_salary: e.target.value })"
+                                class="editable-field">
                         </div>
                         <div class="detail-row total">
                             <span>Net Salary:</span>
@@ -264,6 +379,7 @@ export default {
 
             <div v-else class="no-payslips">
                 <p>No payslips found for this employee</p>
+                <button @click="addNewPayroll" class="add-first-payroll">Add First Payslip</button>
             </div>
         </div>
 
@@ -273,8 +389,87 @@ export default {
     </div>
 </template>
 
-
 <style>
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.emp-salary {
+    font-size: 0.9rem;
+    color: #27ae60;
+    font-weight: 600;
+}
+
+.employee-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.add-payroll-btn {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.add-payroll-btn:hover {
+    background: #219653;
+}
+
+.payslip-actions {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.delete-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    flex: 1;
+}
+
+.delete-btn:hover {
+    background: #c0392b;
+}
+
+.editable-field {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 4px 8px;
+    width: 80px;
+    text-align: right;
+}
+
+.editable-field:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.add-first-payroll {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 20px;
+}
+
+.add-first-payroll:hover {
+    background: #2980b9;
+}
+
 .payroll-container{
     padding: 20px;
     max-width: 1200px;

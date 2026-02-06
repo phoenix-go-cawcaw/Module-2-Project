@@ -1,6 +1,8 @@
 <script>
 import axios from "axios";
 
+const API_BASE = 'http://localhost:5000/api';
+
 export default {
     name: "Employees",
     data() {
@@ -30,7 +32,8 @@ export default {
                 return (
                     (employee.name || "").toLowerCase().includes(search) ||
                     (employee.position || "").toLowerCase().includes(search) ||
-                    (employee.department || "").toLowerCase().includes(search)
+                    (employee.department || "").toLowerCase().includes(search) ||
+                    (employee.contact || "").toLowerCase().includes(search)
                 );
             });
         },
@@ -38,8 +41,9 @@ export default {
     methods: {
         async fetchEmployees() {
             try {
-                const res = await axios.get("http://localhost:5000/api/employees");
-                this.employees = res.data;
+                this.isLoading = true;
+                const res = await axios.get(`${API_BASE}/employees`);
+                this.employees = res.data || [];
             } catch (err) {
                 console.error("Failed to fetch employees:", err);
                 alert("Failed to load employees from backend.");
@@ -70,33 +74,74 @@ export default {
 
         closeModal() {
             this.showModal = false;
+            this.selectedEmployee = {
+                employee_id: null,
+                name: "",
+                position: "",
+                department: "",
+                salary: "",
+                contact: "",
+                employment_history: "",
+            };
+        },
+
+        validateEmployee() {
+            if (!this.selectedEmployee.name.trim()) {
+                alert("Name is required");
+                return false;
+            }
+            if (!this.selectedEmployee.position.trim()) {
+                alert("Position is required");
+                return false;
+            }
+            if (!this.selectedEmployee.department.trim()) {
+                alert("Department is required");
+                return false;
+            }
+            if (!this.selectedEmployee.contact.trim()) {
+                alert("Contact is required");
+                return false;
+            }
+            return true;
         },
 
         async saveEmployee() {
+            if (!this.validateEmployee()) return;
+
             try {
+                const payload = {
+                    name: this.selectedEmployee.name,
+                    position: this.selectedEmployee.position,
+                    department: this.selectedEmployee.department,
+                    contact: this.selectedEmployee.contact || '',
+                    salary: this.selectedEmployee.salary || null,
+                    employment_history: this.selectedEmployee.employment_history || ''
+                };
+
                 if (this.isEditMode) {
-                    const { employee_id, ...payload } = this.selectedEmployee;
-                    await axios.put(`http://localhost:5000/api/employees/${employee_id}`, payload);
+                    await axios.put(`${API_BASE}/employees/${this.selectedEmployee.employee_id}`, payload);
                 } else {
-                    const payload = { ...this.selectedEmployee };
-                    await axios.post("http://localhost:5000/api/employees", payload);
+                    await axios.post(`${API_BASE}/employees`, payload);
                 }
+
                 await this.fetchEmployees();
-                this.showModal = false;
+                this.closeModal();
+                alert(`Employee ${this.isEditMode ? 'updated' : 'added'} successfully!`);
             } catch (err) {
                 console.error("Failed to save employee:", err);
-                alert("Failed to save employee.");
+                alert("Failed to save employee. Please try again.");
             }
         },
 
         async deleteEmployee(employee_id) {
             if (!confirm("Are you sure you want to delete this employee?")) return;
             try {
-                await axios.delete(`http://localhost:5000/api/employees/${employee_id}`);
+                await axios.delete(`${API_BASE}/employees/${employee_id}`);
                 await this.fetchEmployees();
+                alert("Employee deleted successfully!");
             } catch (err) {
                 console.error("Failed to delete employee:", err);
-                alert("Failed to delete employee.");
+                alert("Failed to delete employee. Please try again.");
             }
         },
     },
@@ -124,37 +169,43 @@ export default {
                     <p><b>Position:</b> {{ employee.position }}</p>
                     <p><b>Department:</b> {{ employee.department }}</p>
                     <p><b>Contact:</b> {{ employee.contact }}</p>
-                    <p><b>History:</b> {{ employee.employment_history }}</p>
-                    <p><b>Salary:</b> {{ employee.salary }}</p>
+                    <p><b>History:</b> {{ employee.employment_history || 'N/A' }}</p>
+                    <p><b>Salary:</b> {{ employee.salary ? 'R' + employee.salary : 'N/A' }}</p>
                 </div>
 
-                <button class="action-btn edit" @click="openEdit(employee)">
-                    Edit
-                </button>
+                <div class="card-actions">
+                    <button class="action-btn edit" @click="openEdit(employee)">
+                        Edit
+                    </button>
+                    <button class="action-btn delete" @click="deleteEmployee(employee.employee_id)">
+                        Delete
+                    </button>
+                </div>
             </div>
 
             <div v-if="filteredEmployees.length === 0 && !isLoading" class="no-results">
-                No employees found. Please try a different search.
+                No employees found. {{ searchText ? 'Please try a different search.' : 'Add your first employee.' }}
             </div>
 
             <div v-if="isLoading" class="loading">
                 Loading employees...
             </div>
-            <div class="page-actions">
-                <button class="action-btn primary" @click="openAddModal">
-                    Add Employee
-                </button>
-            </div>
         </div>
 
-        <div v-if="showEditModal" class="modal-backdrop">
+        <div class="page-actions">
+            <button class="action-btn primary" @click="openAddModal">
+                Add Employee
+            </button>
+        </div>
+
+        <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
             <div class="modal">
-                <h2>Edit Employee</h2>
-                <input v-model="selectedEmployee.name" placeholder="Name" />
-                <input v-model="selectedEmployee.position" placeholder="Position" />
-                <input v-model="selectedEmployee.department" placeholder="Department" />
-                <input v-model="selectedEmployee.salary" placeholder="Salary" />
-                <input v-model="selectedEmployee.contact" placeholder="Contact" />
+                <h2>{{ isEditMode ? 'Edit Employee' : 'Add New Employee' }}</h2>
+                <input v-model="selectedEmployee.name" placeholder="Name *" required />
+                <input v-model="selectedEmployee.position" placeholder="Position *" required />
+                <input v-model="selectedEmployee.department" placeholder="Department *" required />
+                <input v-model="selectedEmployee.contact" placeholder="Contact *" required />
+                <input v-model="selectedEmployee.salary" type="number" placeholder="Salary" />
                 <textarea v-model="selectedEmployee.employment_history" placeholder="Employment History"></textarea>
 
                 <div class="modal-actions">
@@ -446,6 +497,84 @@ h1 {
     align-items: center;
     gap: 20px;
     margin-top: 20px;
+}
+
+.card-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.action-btn.delete {
+    background: #e74c3c;
+    color: white;
+}
+
+.action-btn.delete:hover {
+    background: #c0392b;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal h2 {
+    margin-bottom: 20px;
+    color: #2c3e50;
+}
+
+.modal input,
+.modal textarea {
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+.modal textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.dark-mode .modal {
+    background: #2d2d2d;
+    color: #fff;
+}
+
+.dark-mode .modal h2 {
+    color: #fff;
+}
+
+.dark-mode .modal input,
+.dark-mode .modal textarea {
+    background: #3f3f3f;
+    border-color: #555;
+    color: #fff;
 }
 
 @media (max-width: 1200px) and (min-width: 768px) {
