@@ -60,3 +60,7 @@ Frontend Setup
 'npm run dev'
 
 Your frontend will start on the local development URL shown in the terminal (commonly http://localhost:5173 for Vite).
+
+Please Use hard coded login for Frontend Application.
+email: hr@moderntech.com
+password: hr123
