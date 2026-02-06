@@ -183,10 +183,11 @@ const API_BASE = 'http://localhost:5000/api'
 export default {
     name: 'AttendanceView',
     setup() {
+        const leaveRequests = ref([])
         const todayString = new Date().toISOString().slice(0, 10)
 
         const attendanceRecords = ref([])
-        const employees = ref([]) // Add employees data
+        const employees = ref([])
         const selectedMonth = ref(new Date().toISOString().slice(0, 7))
         const selectedStatus = ref('all')
 
@@ -197,14 +198,15 @@ export default {
 
         onMounted(async () => {
             try {
-                // Fetch both employees and attendance data
-                const [employeesRes, attendanceRes] = await Promise.all([
+                const [employeesRes, attendanceRes, leaveRes] = await Promise.all([
                     axios.get(`${API_BASE}/employees`),
-                    axios.get(`${API_BASE}/attendance`)
+                    axios.get(`${API_BASE}/attendance`),
+                    axios.get(`${API_BASE}/leave_requests`)
                 ])
 
-                employees.value = employeesRes.data || []
-                attendanceRecords.value = attendanceRes.data || []
+                employees.value = employeesRes.data || [];
+                attendanceRecords.value = attendanceRes.data || [];
+                leaveRequests.value = leaveRes.data || [];
 
                 console.log('Employees loaded:', employees.value.length)
                 console.log('Attendance records loaded:', attendanceRecords.value.length)
@@ -215,7 +217,6 @@ export default {
             }
         })
 
-        // Transform flat attendance records into employee-based structure
         const transformedAttendance = computed(() => {
             if (!employees.value.length || !attendanceRecords.value.length) return []
 
@@ -223,24 +224,33 @@ export default {
             const daysInMonth = new Date(year, month, 0).getDate()
 
             return employees.value.map(emp => {
-                // Filter attendance records for this employee and selected month
                 const employeeAttendance = attendanceRecords.value.filter(record =>
                     record.employee_id === emp.employee_id &&
-                    record.date &&
-                    record.date.startsWith(selectedMonth.value)
+                    record.attendance_date &&
+                    record.attendance_date.startsWith(selectedMonth.value)
                 )
 
-                // Create attendance map for the month
                 const attendanceMap = {}
                 for (let day = 1; day <= daysInMonth; day++) {
                     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-                    const record = employeeAttendance.find(a => a.date === dateStr)
+                    const record = employeeAttendance.find(a => a.attendance_date.slice (0,10) === dateStr)
                     attendanceMap[dateStr] = record ? record.status : 'Not Recorded'
                 }
 
+                // leaveRequests.value.forEach(leave => {
+                //     const start = new Date(leave.start_date);
+                //     const end = new Date(leave.end_date);
+                //     for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+                //         const dateStr = d.toISOString().slice(0,10);
+                //         if (attendanceMap[dateStr] !== undefined){
+                //             attendanceMap[dateStr] = 'On Leave'
+                //         }
+                //     }
+                // });
+
                 return {
                     ...emp,
-                    employeeId: emp.employee_id, // Ensure employeeId is set
+                    employeeId: emp.employee_id,
                     name: emp.name,
                     attendance: employeeAttendance,
                     attendanceMap
@@ -378,24 +388,19 @@ export default {
         }
 
         const openEditModal = (employeeId, date) => {
-            // Find employee from both sources
             const employee = employees.value.find(e =>
                 e.employee_id === employeeId || e.employeeId === employeeId
             )
 
-            if (!employee) {
-                alert('Employee not found')
-                return
-            }
+            if (!employee) return alert('Employee not found');
+                
 
             selectedEmployee.value = employee
-            selectedDate.value = date
+            selectedDate.value = date.slice(0,10)
 
-            // Find attendance record for this date
+
             const record = attendanceRecords.value.find(a =>
-                (a.employee_id === employee.employee_id || a.employeeId === employee.employee_id) &&
-                a.date === date
-            )
+                a.employee_id === employee.employee_id && a.attendance_date === date.slice(0,10) === selectedDate.value)
 
             editStatus.value = record ? record.status : 'Present'
             showEditModal.value = true
@@ -412,33 +417,31 @@ export default {
 
             try {
                 const payload = {
-                    employee_id: selectedEmployee.value.employee_id || selectedEmployee.value.employeeId,
-                    date: selectedDate.value,
+                    employee_id: selectedEmployee.value.employee_id,
+                    attendance_date: selectedDate.value,
                     status: editStatus.value
                 };
 
-                // Check if record already exists
-                const existingRecord = attendanceRecords.value.find(a =>
-                    (a.employee_id === payload.employee_id || a.employeeId === payload.employee_id) &&
-                    a.date === payload.date
+                //IF RECORD EXISTS
+                let existingRecord = attendanceRecords.value.find(a =>
+                    a.employee_id === payload.employee_id &&
+                    a.attendance_date.slice(0,10) === payload.attendance_date
                 );
 
                 if (existingRecord && existingRecord.attendance_id) {
-                    // Update existing
-                    await axios.put(`${API_BASE}/attendance/${existingRecord.attendance_id}`, payload);
+                    // Update 
+                    await axios.patch(`${API_BASE}/attendance/${existingRecord.attendance_id}`, payload);
+                    existingRecord.status = editStatus.value;
                 } else {
                     // Create new
-                    await axios.post(`${API_BASE}/attendance`, payload);
+                    const res = await axios.post(`${API_BASE}/attendance`, payload);
+                    const newRecord = { attendance_id: res.data.id, ...payload};
+                    attendanceRecords.value.push(newRecord);
                 }
 
                 // Refresh data
-                const [employeesRes, attendanceRes] = await Promise.all([
-                    axios.get(`${API_BASE}/employees`),
-                    axios.get(`${API_BASE}/attendance`)
-                ]);
-
-                employees.value = employeesRes.data || [];
-                attendanceRecords.value = attendanceRes.data || [];
+                if(!selectedEmployee.value.attendanceMap) selectedEmployee.value.attendanceMap = {};
+                selectedEmployee.value.attendanceMap[payload.attendance_date]= editStatus.value;
 
                 closeEditModal();
                 alert('Attendance updated successfully!');

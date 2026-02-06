@@ -376,7 +376,7 @@ h1 {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
-    min-width: 180px;
+    min-width: 90px;
     justify-content: center;
 }
 

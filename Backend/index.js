@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import routes from './routes/empRoutes.js';
+import dotenv from "dotenv";
 
 import {
   getEmployee_infoCon,
@@ -20,11 +22,13 @@ import {
   deleteleave_requestsCon,
 } from "./controllers/empCon.js";
 
+dotenv.config();
 const app = express();
 
 // MIDDLEWARE
 app.use(cors());
 app.use(express.json());
+app.use('/api', routes); // USING ROUTES DEFINED IN EMPROUTES.JS
 
 // EMPLOYEES
 app.get("/api/employees", getEmployee_infoCon);
@@ -35,13 +39,13 @@ app.delete("/api/employees/:employee_id", deleteEmployee_infoCon);
 // PAYROLL
 app.get("/api/payroll", getpayrollCon);
 app.post("/api/payroll", insertpayrollCon);
-app.patch("/api/payroll/:id/:employee_id", updatepayrollCon);
+app.patch("/api/payroll/:id", updatepayrollCon);
 app.delete("/api/payroll/:id", deletepayrollCon);
 
 // ATTENDANCE
 app.get("/api/attendance", getattendanceCon);
 app.post("/api/attendance", insertattendanceCon);
-app.patch("/api/attendance/:attendance_id/:employee_id", updateattendanceCon);
+app.patch("/api/attendance/:attendance_id", updateattendanceCon);
 app.delete("/api/attendance/:attendance_id", deleteattendanceCon);
 
 // LEAVE REQUESTS

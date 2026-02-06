@@ -6,293 +6,215 @@ import jsPDF from 'jspdf'
 const API_BASE = 'http://localhost:5000/api'
 
 export default {
-    name: 'PayrollView',
-    setup() {
-        const search = ref("")
-        const selectedEmployee = ref(null)
-        const employees = ref([])
-        const payrolls = ref([])
-        const isLoading = ref(false)
-        const selectedMonth = ref(new Date().toISOString().slice(0, 7))
+  name: 'PayrollView',
+  setup() {
+    const search = ref('')
+    const selectedEmployee = ref(null)
+    const employees = ref([])
+    const payrolls = ref([])
+    const isLoading = ref(false)
 
-        const fetchEmployees = async () => {
-            try {
-                const res = await axios.get(`${API_BASE}/employees`)
-                employees.value = res.data || []
-            } catch (err) {
-                console.error('Failed to fetch employees:', err)
-                alert('Failed to load employees from backend.')
-            }
-        }
-
-        const fetchPayrolls = async () => {
-            try {
-                const res = await axios.get(`${API_BASE}/payroll`)
-                payrolls.value = res.data || []
-            } catch (err) {
-                console.error('Failed to fetch payrolls:', err)
-                alert('Failed to load payroll data.')
-            }
-        }
-
-        const filteredEmployees = computed(() => {
-            if (!search.value) return employees.value
-            
-            return employees.value.filter(emp =>
-                emp.name.toLowerCase().includes(search.value.toLowerCase())
-            )
-        })
-
-        function selectEmployee(emp) {
-            const employeePayrolls = payrolls.value.filter(p => p.employee_id === emp.employee_id)
-            
-            // Format payroll data for display
-            const formattedPayrolls = employeePayrolls.map(p => ({
-                id: p.id,
-                employeeId: p.employee_id,
-                month: new Date(p.created_at || new Date()).toLocaleDateString('en-US', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                }),
-                hoursWorked: p.hours_worked || 160,
-                leaveDeductions: p.leave_deductions || 0,
-                finalSalary: p.final_salary || emp.salary || 0,
-                created_at: p.created_at
-            }))
-            
-            selectedEmployee.value = {
-                ...emp,
-                payslips: formattedPayrolls
-            }
-            search.value = ""
-        }
-
-        function clearSelection() {
-            selectedEmployee.value = null
-            search.value = ""
-        }
-
-        async function addNewPayroll() {
-            if (!selectedEmployee.value) return
-            
-            try {
-                const monthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                
-                const payload = {
-                    employee_id: selectedEmployee.value.employee_id,
-                    hours_worked: 160, // Default hours
-                    leave_deductions: 0,
-                    final_salary: selectedEmployee.value.salary || 0,
-                    month: monthName
-                }
-                
-                const res = await axios.post(`${API_BASE}/payroll`, payload)
-                
-                // Refresh payroll data
-                await fetchPayrolls()
-                
-                // Update selected employee
-                selectEmployee(selectedEmployee.value)
-                
-                alert('Payroll entry added successfully!')
-            } catch (err) {
-                console.error('Failed to add payroll:', err)
-                alert('Failed to add payroll entry.')
-            }
-        }
-
-        async function updatePayroll(payrollId, updates) {
-            try {
-                const payload = {
-                    employee_id: selectedEmployee.value.employee_id,
-                    ...updates
-                }
-                
-                await axios.put(`${API_BASE}/payroll/${payrollId}/${selectedEmployee.value.employee_id}`, payload)
-                
-                // Refresh payroll data
-                await fetchPayrolls()
-                
-                // Update selected employee
-                selectEmployee(selectedEmployee.value)
-                
-                alert('Payroll updated successfully!')
-            } catch (err) {
-                console.error('Failed to update payroll:', err)
-                alert('Failed to update payroll.')
-            }
-        }
-
-        async function deletePayroll(payrollId) {
-            if (!confirm('Are you sure you want to delete this payroll entry?')) return
-            
-            try {
-                await axios.delete(`${API_BASE}/payroll/${payrollId}`)
-                
-                // Refresh payroll data
-                await fetchPayrolls()
-                
-                // Update selected employee
-                selectEmployee(selectedEmployee.value)
-                
-                alert('Payroll entry deleted successfully!')
-            } catch (err) {
-                console.error('Failed to delete payroll:', err)
-                alert('Failed to delete payroll entry.')
-            }
-        }
-
-        function generatePayslip(slip) {
-            const employee = selectedEmployee.value
-
-            const doc = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            })
-
-            doc.setProperties({
-                title: `Payslip - ${employee.name} - ${slip.month}`,
-                subject: 'Monthly Payslip',
-                author: 'ModernTech Solutions',
-                creator: 'HR Payroll System'
-            })
-
-            doc.setTextColor(44, 62, 80)
-            doc.setFontSize(20)
-            doc.setFont('helvetica', 'bold')
-            doc.text('ModernTech Solutions', 110, 20, { align: 'center' })
-
-            doc.setFontSize(14)
-            doc.text('Monthly Payslip', 110, 27, { align: 'center' })
-
-            doc.setTextColor(0, 0, 0)
-
-            doc.setFontSize(16)
-            doc.setFont('helvetica', 'bold')
-            doc.setTextColor(44, 62, 80)
-            doc.text('Employee Details', 20, 40)
-
-            doc.setDrawColor(52, 152, 219)
-            doc.setLineWidth(0.5)
-            doc.line(20, 42, 190, 42)
-
-            doc.setFontSize(11)
-            doc.setFont('helvetica', 'bold')
-            doc.text('Name:', 20, 50)
-            doc.text('Employee ID:', 20, 56)
-            doc.text('Position:', 20, 62)
-            doc.text('Department:', 20, 68)
-            doc.text('Pay Period:', 20, 74)
-
-            doc.setFont('helvetica', 'normal')
-            doc.text(String(employee.name), 60, 50)
-            doc.text(String(employee.employee_id), 60, 56)
-            doc.text(String(employee.position), 60, 62)
-            doc.text(String(employee.department || 'N/A'), 60, 68)
-            doc.text(String(slip.month), 60, 74)
-
-            doc.setFontSize(16)
-            doc.setFont('helvetica', 'bold')
-            doc.setTextColor(44, 62, 80)
-            doc.text('Payment Details', 20, 90)
-            doc.line(20, 92, 190, 92)
-
-            doc.setFontSize(11)
-            doc.setFont('helvetica', 'bold')
-
-            const startY = 100
-            const col1X = 20
-            const col2X = 130
-
-            doc.text('Hours Worked', col1X, startY)
-            doc.text('Hourly Rate', col1X, startY + 6)
-            doc.text('Gross Salary', col1X, startY + 12)
-            doc.text('Leave Deductions', col1X, startY + 18)
-
-            const hourlyRate = slip.finalSalary / slip.hoursWorked
-            const grossSalary = slip.hoursWorked * hourlyRate
-            doc.text(String(slip.hoursWorked), col2X, startY)
-            doc.text(`R${hourlyRate.toFixed(2)}`, col2X, startY + 6)
-            doc.text(`R${grossSalary.toFixed(2)}`, col2X, startY + 12)
-            doc.text(`R${(slip.leaveDeductions || 0).toFixed(2)}`, col2X, startY + 18)
-
-            const netSalaryY = startY + 30
-            doc.setFillColor(39, 174, 96)
-            doc.roundedRect(20, netSalaryY, 170, 15, 3, 3, 'F')
-
-            doc.setFontSize(10)
-            doc.setFont('helvetica', 'bold')
-            doc.setTextColor(255, 255, 255)
-            doc.text('NET SALARY PAYABLE', 105, netSalaryY + 7, { align: 'center' })
-
-            doc.setFontSize(16)
-            doc.text(`R ${slip.finalSalary.toFixed(2)}`, 105, netSalaryY + 13, { align: 'center' })
-
-            const summaryY = netSalaryY + 25
-
-            doc.setFillColor(248, 249, 250)
-            doc.roundedRect(20, summaryY, 170, 25, 3, 3, 'F')
-
-            doc.setFontSize(12)
-            doc.setFont('helvetica', 'bold')
-            doc.setTextColor(44, 62, 80)
-            doc.text('Payment Summary', 105, summaryY + 8, { align: 'center' })
-
-            doc.setFontSize(10)
-            doc.setFont('helvetica', 'normal')
-            doc.setTextColor(100, 100, 100)
-            doc.text('Payment Method: Electronic Transfer', 105, summaryY + 16, { align: 'center' })
-            doc.text('Payment Date: Last working day of the month', 105, summaryY + 22, { align: 'center' })
-
-            const footerY = 250
-
-            doc.setDrawColor(200, 200, 200)
-            doc.line(20, footerY, 190, footerY)
-
-            doc.setFontSize(9)
-            doc.setFont('helvetica', 'italic')
-            doc.setTextColor(100, 100, 100)
-            doc.text(`Generated: ${new Date().toLocaleString()}`, 20, footerY + 5)
-            doc.text('This is an official payslip from ModernTech Solutions', 105, footerY + 5, { align: 'center' })
-
-            doc.setFontSize(8)
-            doc.text('HR Department: hr@moderntechsolutions.co.za | Tel: (011) 123-4567', 105, footerY + 12, { align: 'center' })
-
-            doc.setDrawColor(220, 220, 220)
-            doc.rect(10, 10, 190, 277)
-
-            const fileName = `payslip-${employee.name.toLowerCase().replace(/\s+/g, '-')}-${slip.month.toLowerCase().replace(/\s+/g, '-')}`
-            doc.save(`${fileName}.pdf`)
-        }
-
-        onMounted(async () => {
-            isLoading.value = true
-            try {
-                await Promise.all([fetchEmployees(), fetchPayrolls()])
-            } catch (err) {
-                console.error('Failed to load data:', err)
-            } finally {
-                isLoading.value = false
-            }
-        })
-
-        return {
-            search,
-            selectedEmployee,
-            filteredEmployees,
-            selectEmployee,
-            clearSelection,
-            generatePayslip,
-            addNewPayroll,
-            updatePayroll,
-            deletePayroll,
-            isLoading,
-            selectedMonth
-        }
+    const fetchEmployees = async () => {
+      const res = await axios.get(`${API_BASE}/employees`)
+      employees.value = res.data || []
     }
+
+    const fetchPayrolls = async () => {
+      const res = await axios.get(`${API_BASE}/payroll`)
+      payrolls.value = res.data || []
+    }
+
+    const filteredEmployees = computed(() => {
+      if (!search.value) return employees.value
+      return employees.value.filter(e =>
+        e.name.toLowerCase().includes(search.value.toLowerCase())
+      )
+    })
+
+    function selectEmployee(emp) {
+      const employeePayrolls = payrolls.value.filter(
+        p => p.employee_id === emp.employee_id
+      )
+
+      selectedEmployee.value = {
+        ...emp,
+        payslips: employeePayrolls.map(p => ({
+          id: p.id,
+          employeeId: p.employee_id,
+          month: p.month_display,
+          hoursWorked: Number(p.hours_worked) || 0,
+          leaveDeductions: Number(p.leave_deductions) || 0,
+          finalSalary: Number(p.final_salary) || 0,
+          created_at: p.created_at
+        }))
+      }
+
+      search.value = ''
+    }
+
+    function clearSelection() {
+      selectedEmployee.value = null
+      search.value = ''
+    }
+
+    async function addNewPayroll() {
+      if (!selectedEmployee.value) return
+
+      await axios.post(`${API_BASE}/payroll`, {
+        employee_id: selectedEmployee.value.employee_id,
+        hours_worked: 160,
+        leave_deductions: 0,
+        final_salary: Number(selectedEmployee.value.salary) || 0
+      })
+
+      await fetchPayrolls()
+      selectEmployee(selectedEmployee.value)
+    }
+
+    async function updatePayroll(id, updates) {
+      const slip = selectedEmployee.value.payslips.find(p => p.id === id)
+      if (!slip) return
+
+      if (updates.hours_worked !== undefined)
+        slip.hoursWorked = Number(updates.hours_worked)
+
+      if (updates.leave_deductions !== undefined)
+        slip.leaveDeductions = Number(updates.leave_deductions)
+
+      if (updates.final_salary !== undefined)
+        slip.finalSalary = Number(updates.final_salary)
+
+      await axios.put(`${API_BASE}/payroll/${id}`, {
+        hours_worked: slip.hoursWorked,
+        leave_deductions: slip.leaveDeductions,
+        final_salary: slip.finalSalary
+      })
+    }
+
+    async function deletePayroll(id) {
+      if (!confirm('Delete this payroll entry?')) return
+      await axios.delete(`${API_BASE}/payroll/${id}`)
+      await fetchPayrolls()
+      selectEmployee(selectedEmployee.value)
+    }
+    function generatePayslip(slip) {
+      const employee = selectedEmployee.value
+
+      const hoursWorked = Number(slip.hoursWorked) || 0
+      const finalSalary = Number(slip.finalSalary) || 0
+      const leaveDeductions = Number(slip.leaveDeductions) || 0
+      const hourlyRate = hoursWorked > 0 ? finalSalary / hoursWorked : 0
+      const grossSalary = hoursWorked * hourlyRate
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+      doc.setProperties({
+        title: `Payslip - ${employee.name} - ${slip.month}`,
+        subject: 'Monthly Payslip',
+        author: 'ModernTech Solutions',
+        creator: 'HR Payroll System'
+      })
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(20)
+      doc.setTextColor(44, 62, 80)
+      doc.text('ModernTech Solutions', 105, 20, { align: 'center' })
+
+      doc.setFontSize(14)
+      doc.text('Monthly Payslip', 105, 27, { align: 'center' })
+
+      doc.setFontSize(16)
+      doc.text('Employee Details', 20, 40)
+      doc.setDrawColor(52, 152, 219)
+      doc.line(20, 42, 190, 42)
+
+      doc.setFontSize(11)
+      doc.text('Name:', 20, 50)
+      doc.text('Employee ID:', 20, 56)
+      doc.text('Position:', 20, 62)
+      doc.text('Department:', 20, 68)
+      doc.text('Pay Period:', 20, 74)
+
+      doc.setFont('helvetica', 'normal')
+      doc.text(employee.name, 60, 50)
+      doc.text(String(employee.employee_id), 60, 56)
+      doc.text(employee.position, 60, 62)
+      doc.text(employee.department || 'N/A', 60, 68)
+      doc.text(slip.month, 60, 74)
+
+      /* ===== PAYMENT DETAILS ===== */
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(16)
+      doc.text('Payment Details', 20, 90)
+      doc.line(20, 92, 190, 92)
+
+      doc.setFontSize(11)
+      doc.text('Hours Worked', 20, 100)
+      doc.text('Hourly Rate', 20, 106)
+      doc.text('Gross Salary', 20, 112)
+      doc.text('Leave Deductions', 20, 118)
+
+      doc.setFont('helvetica', 'normal')
+      doc.text(String(hoursWorked), 130, 100)
+      doc.text(`R${hourlyRate.toFixed(2)}`, 130, 106)
+      doc.text(`R${grossSalary.toFixed(2)}`, 130, 112)
+      doc.text(`R${leaveDeductions.toFixed(2)}`, 130, 118)
+
+      doc.setFillColor(39, 174, 96)
+      doc.roundedRect(20, 130, 170, 15, 3, 3, 'F')
+
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(10)
+      doc.text('NET SALARY PAYABLE', 105, 137, { align: 'center' })
+
+      doc.setFontSize(16)
+      doc.text(`R ${finalSalary.toFixed(2)}`, 105, 143, { align: 'center' })
+
+      doc.setTextColor(100)
+      doc.setFontSize(9)
+      doc.line(20, 250, 190, 250)
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 255)
+      doc.text(
+        'This is an official payslip from ModernTech Solutions',
+        105,
+        255,
+        { align: 'center' }
+      )
+
+      doc.rect(10, 10, 190, 277)
+
+      const fileName = `payslip-${employee.name}-${slip.month}`
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+
+      doc.save(`${fileName}.pdf`)
+    }
+
+    onMounted(async () => {
+      isLoading.value = true
+      await Promise.all([fetchEmployees(), fetchPayrolls])
+      isLoading.value = false
+    })
+
+    return {
+      search,
+      selectedEmployee,
+      filteredEmployees,
+      selectEmployee,
+      clearSelection,
+      addNewPayroll,
+      updatePayroll,
+      deletePayroll,
+      generatePayslip,
+      isLoading
+    }
+  }
 }
 </script>
+
+
 
 <template>
     <div class="payroll-container">
@@ -347,14 +269,18 @@ export default {
                     </div>
 
                     <div class="payslip-actions">
-                        <button @click="generatePayslip(slip)" class="generate-btn">Download PDF</button>
+                        <button @click="generatePayslip(slip)"
+                            :disabled="slip.id && slip.id.toString().startsWith('temp_')" class="generate-btn">
+                            {{ slip.id && slip.id.toString().startsWith('temp_') ? 'Save First' : 'Download PDF' }}
+                        </button>
                         <button @click="deletePayroll(slip.id)" class="delete-btn">Delete</button>
                     </div>
 
                     <div class="payslip-details">
                         <div class="detail-row">
                             <span>Hours Worked:</span>
-                            <input :value="slip.hoursWorked" @change="e => updatePayroll(slip.id, { hours_worked: e.target.value })"
+                            <input :value="slip.hoursWorked"
+                                @change="e => updatePayroll(slip.id, { hours_worked: e.target.value })"
                                 class="editable-field">
                         </div>
                         <div class="detail-row">
@@ -470,36 +396,36 @@ export default {
     background: #2980b9;
 }
 
-.payroll-container{
+.payroll-container {
     padding: 20px;
     max-width: 1200px;
     margin: 0 auto;
     min-height: calc(100vh - 120px);
 }
 
-.page-title{
+.page-title {
     margin-bottom: 30px;
     color: #2c3e50;
     font-size: 2rem;
     text-align: center;
 }
 
-.dark-mode .page-title{
+.dark-mode .page-title {
     margin-bottom: 30px;
     color: #d8d8d8;
     font-size: 2rem;
     text-align: center;
 }
 
-.dark-mode .search-title{
+.dark-mode .search-title {
     color: #d8d8d8;
 }
 
-.search-container{
+.search-container {
     margin-bottom: 30px;
 }
 
-.search-input{
+.search-input {
     width: 100%;
     padding: 12px;
     border: 2px solid #e0e0e0;
@@ -508,17 +434,17 @@ export default {
     transition: border-color 0.3s;
 }
 
-.search-input:focus{
+.search-input:focus {
     outline: none;
     border-color: #3498db;
 }
 
-.search-input:disabled{
+.search-input:disabled {
     background-color: #f5f5f5;
     cursor: not-allowed;
 }
 
-.employee-list{
+.employee-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 16px;
@@ -527,7 +453,7 @@ export default {
     padding: 0;
 }
 
-.emp-item{
+.emp-item {
     background: white;
     border-radius: 10px;
     border: 1px solid black;
@@ -538,7 +464,7 @@ export default {
     align-items: center;
 }
 
-.dark-mode .emp-item{
+.dark-mode .emp-item {
     background: #3f3f3f;
     border-radius: 10px;
     border: 1px solid rgb(255, 255, 255);
@@ -549,31 +475,31 @@ export default {
     align-items: center;
 }
 
-.emp-item:hover{
+.emp-item:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border-color: #3498db;
 }
 
-.emp-info{
+.emp-info {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-.emp-name{
+.emp-name {
     font-weight: 600;
     font-size: 1.1rem;
     color: #2c3e50;
 }
 
-.dark-mode .emp-name{
+.dark-mode .emp-name {
     font-weight: 600;
     font-size: 1.1rem;
     color: #d8d8d8;
 }
 
-.emp-position{
+.emp-position {
     font-size: 0.9rem;
     padding: 4px 10px;
     border-radius: 6px;
@@ -584,7 +510,7 @@ export default {
     width: fit-content;
 }
 
-.dark-mode .emp-position{
+.dark-mode .emp-position {
     font-size: 0.9rem;
     padding: 4px 10px;
     border-radius: 6px;
@@ -595,13 +521,13 @@ export default {
     width: fit-content;
 }
 
-.emp-arrow{
+.emp-arrow {
     color: #3498db;
     font-size: 2rem;
     font-weight: bold;
 }
 
-.no-results{
+.no-results {
     text-align: center;
     padding: 40px;
     color: #666;
@@ -610,7 +536,7 @@ export default {
     margin-top: 20px;
 }
 
-.employee-card{
+.employee-card {
     background: white;
     border-radius: 16px;
     padding: 32px;
@@ -620,15 +546,22 @@ export default {
 }
 
 @keyframes fadeIn {
-    from{opacity:0; transform: translateY(10px);}
-    to{opacity: 1; transform: translateY(0);}
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.employee-card-header{
+.employee-card-header {
     margin-bottom: 24px;
 }
 
-.back-btn{
+.back-btn {
     background: none;
     border: none;
     color: #3498db;
@@ -641,61 +574,62 @@ export default {
     transition: color 0.3s;
 }
 
-.back-btn:hover{
+.back-btn:hover {
     color: #2980b9;
     text-decoration: underline;
 }
 
-.employee-header{
+.employee-header {
     margin-bottom: 32px;
     padding-bottom: 24px;
     border-bottom: 1px solid #e0e0e0;
 }
 
-.employee-header h2{
+.employee-header h2 {
     margin: 0 0 8px 0;
     font-size: 1.8rem;
     color: #2c3e50;
 }
 
-.dark-mode .employee-header h2{
+.dark-mode .employee-header h2 {
     margin: 0 0 8px 0;
     font-size: 1.8rem;
     color: #d8d8d8;
 }
 
-.employee-position{
+.employee-position {
     font-weight: 600;
     font-size: 1.1rem;
     margin: 0 0 8px 0;
     color: #666;
 }
-.employee-id{
+
+.employee-id {
     margin: 0;
     color: #888;
     font-size: 0.9rem;
 }
 
-.payslips-title{
+.payslips-title {
     margin: 0 0 24px 0;
     font-size: 1.5rem;
     color: #2c3e50;
 }
 
-.dark-mode .payslips-title{
+.dark-mode .payslips-title {
     margin: 0 0 24px 0;
     font-size: 1.5rem;
     color: #d8d8d8;
 }
 
-.payslips-grid{
+.payslips-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 20px;
     margin-top: 20px;
 }
 
-.payslip-card{
+.payslip-card {
     background: white;
     border-radius: 12px;
     padding: 24px;
@@ -703,7 +637,7 @@ export default {
     transition: all 0.3s;
 }
 
-.payslip-header{
+.payslip-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -712,13 +646,13 @@ export default {
     border-bottom: 1px solid #e0e0e0;
 }
 
-.month{
+.month {
     font-size: 1.2rem;
     font-weight: 600;
     color: #2c3e50;
 }
 
-.salary{
+.salary {
     font-weight: 700;
     font-size: 1.3rem;
     padding: 6px 12px;
@@ -727,7 +661,7 @@ export default {
     color: white;
 }
 
- .generate-btn{
+.generate-btn {
     background: #3498db;
     color: white;
     border: none;
@@ -745,53 +679,54 @@ export default {
     gap: 10px;
 }
 
-.generate-btn:hover{
+.generate-btn:hover {
     background: #2980b9;
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(41, 128, 185, 0.3);
-} 
+}
 
-.payslip-details{
+.payslip-details {
     margin-top: 20px;
 }
 
-.detail-row{
-    display:flex;
+.detail-row {
+    display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px 0;
     border-bottom: 1px solid #f0f0f0;
 }
 
-.detail-row:last-child{
+.detail-row:last-child {
     border-bottom: none;
 }
-.detail-row.total{
+
+.detail-row.total {
     padding-top: 15px;
     margin-top: 10px;
     border-top: 2px solid #3498db;
     font-weight: bold;
 }
 
-.detail-row span:first-child{
+.detail-row span:first-child {
     color: #666;
 }
 
-.value{
+.value {
     font-weight: 600;
     color: #2c3e50;
 }
 
-.deduction{
+.deduction {
     color: #e74c3c;
 }
 
-.total-salary{
+.total-salary {
     color: #27ae60;
     font-size: 1.1rem;
 }
 
-.no-payslips{
+.no-payslips {
     text-align: center;
     padding: 40px;
     color: #666;
@@ -799,7 +734,7 @@ export default {
     border-radius: 8px;
 }
 
-.instruction{
+.instruction {
     text-align: center;
     padding: 40px;
     color: #666;
@@ -808,7 +743,7 @@ export default {
     margin-top: 20px;
 }
 
-.dark-mode .instruction{
+.dark-mode .instruction {
     text-align: center;
     padding: 40px;
     color: #d8d8d8;
@@ -827,23 +762,29 @@ export default {
     transform: translateY(0)
 }
 
-@media (max-width:425px){
-    .payslips-grid{
+@media (max-width:425px) {
+    .payslips-grid {
         grid-template-columns: 1fr
     }
+
     .employee-list {
         grid-template-columns: 1fr;
     }
-    .payroll-container{
+
+    .payroll-container {
         padding: 20px
     }
-    .employee-card{
+
+    .employee-card {
         padding: 20px;
     }
 }
 
-@media print{
-    .search-container, .generate-btn, .back-btn{
+@media print {
+
+    .search-container,
+    .generate-btn,
+    .back-btn {
         display: none !important;
     }
 }

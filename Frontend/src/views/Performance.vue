@@ -12,7 +12,6 @@ const attendanceData = ref([])
 const leaveRequests = ref([])
 const isLoading = ref(true)
 
-// Fetch all data
 const fetchAllData = async () => {
     try {
         isLoading.value = true;
@@ -35,22 +34,17 @@ const fetchAllData = async () => {
     }
 }
 
-// Process data for performance evaluation
 const processPerformanceData = () => {
     employees.value = employees.value.map(emp => {
-        // Get employee attendance
         const employeeAttendance = attendanceData.value.filter(a => a.employee_id === emp.employee_id);
-        
-        // Calculate attendance stats
+
         const presentDays = employeeAttendance.filter(a => a.status === 'Present').length;
         const totalDays = employeeAttendance.length;
         const attendancePercentage = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
-        
-        // Get leave requests
+
         const employeeLeaves = leaveRequests.value.filter(l => l.employee_id === emp.employee_id);
         const pendingLeaves = employeeLeaves.filter(l => l.status === 'Pending');
-        
-        // Calculate performance level
+
         let performanceLevel = 'Good';
         let evaluationNotes = 'Consistent attendance and performance.';
         let recommendation = 'Continue current practices.';
@@ -73,15 +67,13 @@ const processPerformanceData = () => {
             recommendation = 'Immediate follow-up required.';
         }
 
-        // Add leave concerns
         if (pendingLeaves.length > 0) {
             concerns.push(`${pendingLeaves.length} pending leave requests`);
             actions.push('Resolve pending leave requests');
         }
 
-        // Get recent month for evaluation period
-        const recentMonth = employeeAttendance.length > 0 
-            ? new Date(employeeAttendance[0].date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        const recentMonth = employeeAttendance.length > 0
+            ? new Date(employeeAttendance[0].attendance_date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
             : new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
         return {
@@ -199,7 +191,6 @@ function getAttendanceStatus(emp) {
 
 function showDetails(emp) {
     console.log('Showing details for:', emp.name)
-    // You can implement a modal or detailed view here
 }
 
 function scheduleReview(emp) {
@@ -221,19 +212,18 @@ function exportPerformanceReport() {
             evaluationNotes: emp.evaluationNotes
         }))
     }
-    
+
     const dataStr = JSON.stringify(report, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    
-    const exportFileDefaultName = `performance-report-${new Date().toISOString().slice(0,10)}.json`;
-    
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+    const exportFileDefaultName = `performance-report-${new Date().toISOString().slice(0, 10)}.json`;
+
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
 }
 
-// Refresh data function
 const refreshData = async () => {
     await fetchAllData();
     alert('Performance data refreshed!');
@@ -253,7 +243,7 @@ const refreshData = async () => {
                 <span class="period-label"> Evaluation Period: </span>
                 <span class="period-value"> {{ employees[0]?.recentMonth || 'Current Month' }} </span>
             </div>
-            
+
             <div class="header-actions">
                 <button @click="refreshData" class="refresh-btn">
                     <i class="bi bi-arrow-clockwise"></i> Refresh Data
@@ -281,7 +271,7 @@ const refreshData = async () => {
                 <div class="stat-card">
                     <div class="stat-icon"> <i class="bi bi-card-checklist"> </i> </div>
                     <div class="stat-content">
-                        <h3> Average Attendance </h3> 
+                        <h3> Average Attendance </h3>
                         <div class="stat-value">{{ overallStats.averageAttendance }}%</div>
                         <div class="stat-label"> Monthly Average </div>
                     </div>
@@ -312,7 +302,7 @@ const refreshData = async () => {
                         <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
                     </select>
                 </div>
-                
+
                 <div class="filter-group">
                     <label for="performance-filter">Filter by Performance:</label>
                     <select id="performance-filter" v-model="selectedPerformance">
@@ -322,7 +312,7 @@ const refreshData = async () => {
                         <option value="needs-improvement">Needs Improvement (&lt;80%)</option>
                     </select>
                 </div>
-                
+
                 <button @click="selectedDepartment = 'all'; selectedPerformance = 'all'" class="reset-btn">
                     Reset Filters
                 </button>
@@ -330,7 +320,8 @@ const refreshData = async () => {
 
             <div class="categories-section">
                 <div class="category-tabs">
-                    <button @click="setActiveCategory('top')" :class="['tab-btn', { active: activeCategory === 'top' }]">
+                    <button @click="setActiveCategory('top')"
+                        :class="['tab-btn', { active: activeCategory === 'top' }]">
                         Top Performers ({{ topPerformers?.length || 0 }})
                     </button>
                     <button @click="setActiveCategory('average')"
@@ -419,7 +410,8 @@ const refreshData = async () => {
                             </div>
                             <div class="employee-actions">
                                 <button @click="showDetails(emp)" class="action-btn">View Details</button>
-                                <button @click="scheduleReview(emp)" class="action-btn secondary">Schedule Review</button>
+                                <button @click="scheduleReview(emp)" class="action-btn secondary">Schedule
+                                    Review</button>
                             </div>
                         </div>
                     </div>
@@ -471,11 +463,39 @@ const refreshData = async () => {
 </template>
 
 <style>
+:root {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-tertiary: #64748b;
+    --border-color: #e2e8f0;
+    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --header-gradient: linear-gradient(135deg, #ffb340 0%, #4c4ba2 100%);
+}
+
+.dark-mode {
+    --bg-primary: #121416;
+    --bg-secondary: #1a1c1e;
+    --bg-tertiary: #2d2d2d;
+    --text-primary: #ffffff;
+    --text-secondary: #e2e8f0;
+    --text-tertiary: #94a3b8;
+    --border-color: #2d3748;
+    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --header-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
 .loading-section {
     text-align: center;
     padding: 60px;
     color: #666;
     font-size: 1.2rem;
+}
+
+.dark-mode .loading-section {
+    color: #94a3b8;
 }
 
 .header-actions {
@@ -485,7 +505,8 @@ const refreshData = async () => {
     margin-top: 20px;
 }
 
-.refresh-btn, .export-report-btn {
+.refresh-btn,
+.export-report-btn {
     padding: 10px 20px;
     border: none;
     border-radius: 6px;
@@ -494,6 +515,7 @@ const refreshData = async () => {
     display: flex;
     align-items: center;
     gap: 8px;
+    transition: all 0.3s ease;
 }
 
 .refresh-btn {
@@ -514,6 +536,22 @@ const refreshData = async () => {
     background: #219653;
 }
 
+.dark-mode .refresh-btn {
+    background: #2563eb;
+}
+
+.dark-mode .refresh-btn:hover {
+    background: #1d4ed8;
+}
+
+.dark-mode .export-report-btn {
+    background: #059669;
+}
+
+.dark-mode .export-report-btn:hover {
+    background: #047857;
+}
+
 .no-data {
     text-align: center;
     padding: 40px;
@@ -524,36 +562,36 @@ const refreshData = async () => {
 
 .dark-mode .no-data {
     background: #2d2d2d;
-    color: #ddd;
+    color: #94a3b8;
 }
 
 .performance-evaluation {
     padding: 24px;
     max-width: 1400px;
     margin: 0 auto;
-    background: #f8fafc;
+    background: var(--bg-primary);
     min-height: 100vh;
-}
-
-.dark-mode .performance-evaluation {
-    background: #121416;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
 }
 
 .header-section {
     text-align: center;
     margin-bottom: 32px;
     padding: 24px;
-    background: linear-gradient(135deg, #ffb340 0%, #4c4ba2 100%);
+    background: var(--header-gradient);
     color: #ffffff;
     border-radius: 16px;
+    box-shadow: var(--card-shadow);
 }
 
 .page-title {
     font-size: 2.5rem;
     margin-bottom: 8px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.page-subtitle {
+.subtitle {
     font-size: 1.1rem;
     opacity: 0.9;
     margin-bottom: 16px;
@@ -566,6 +604,7 @@ const refreshData = async () => {
     background: rgba(255, 255, 255, 0.2);
     padding: 8px 16px;
     border-radius: 20px;
+    backdrop-filter: blur(10px);
 }
 
 .summary-stats {
@@ -576,22 +615,20 @@ const refreshData = async () => {
 }
 
 .stat-card {
-    background: white;
+    background: var(--bg-secondary);
     border-radius: 12px;
     padding: 24px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--card-shadow);
     display: flex;
     align-items: center;
     gap: 20px;
-    transition: transform 0.3s ease;
-}
-
-.dark-mode .stat-card{
-    background: rgb(41, 41, 41);
+    transition: all 0.3s ease;
+    border: 1px solid var(--border-color);
 }
 
 .stat-card:hover {
     transform: translateY(-4px);
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
 }
 
 .stat-card.warning {
@@ -600,28 +637,28 @@ const refreshData = async () => {
 
 .stat-icon {
     font-size: 2.5rem;
+    color: #3b82f6;
+}
+
+.dark-mode .stat-icon {
+    color: #60a5fa;
 }
 
 .stat-content h3 {
     margin: 0 0 8px 0;
     font-size: 1rem;
-    color: #64748b;
-}
-
-.dark-mode .stat-content h3 {
-    margin: 0 0 8px 0;
-    font-size: 1rem;
-    color: #d8d8d8;
+    color: var(--text-tertiary);
 }
 
 .stat-value {
     font-size: 2rem;
     font-weight: bold;
     margin: 0;
+    color: var(--text-primary);
 }
 
 .stat-label {
-    color: #94a3b8;
+    color: var(--text-tertiary);
     font-size: 0.875rem;
     margin: 0;
 }
@@ -631,14 +668,11 @@ const refreshData = async () => {
     gap: 20px;
     margin-bottom: 32px;
     padding: 20px;
-    background: white;
+    background: var(--bg-secondary);
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--card-shadow);
     align-items: flex-end;
-}
-
-.dark-mode .filter-section{
-    background: rgb(41, 41, 41);
+    border: 1px solid var(--border-color);
 }
 
 .filter-group {
@@ -649,63 +683,69 @@ const refreshData = async () => {
     display: block;
     margin-bottom: 8px;
     font-weight: 500;
-    color: #475569;
+    color: var(--text-secondary);
 }
 
 .filter-group select {
     width: 100%;
     padding: 10px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--border-color);
     border-radius: 8px;
     font-size: 1rem;
-    background: white;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.3s ease;
+}
+
+.filter-group select:focus {
+    outline: none;
+    border-color: #3b82f6;
 }
 
 .reset-btn {
     padding: 10px 24px;
-    background: #64748b;
+    background: var(--text-tertiary);
     color: white;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
+    transition: background 0.3s ease;
 }
 
 .reset-btn:hover {
-    background: #475569;
+    background: var(--text-secondary);
 }
 
-.categories-section {
-    margin-bottom: 32px;
+.dark-mode .reset-btn {
+    background: #4b5563;
+}
+
+.dark-mode .reset-btn:hover {
+    background: #374151;
 }
 
 .category-tabs {
     display: flex;
     gap: 8px;
     margin-bottom: 24px;
-    border-bottom: 2px solid #e2e8f0;
+    border-bottom: 2px solid var(--border-color);
     padding-bottom: 8px;
 }
 
 .tab-btn {
     padding: 12px 24px;
-    background: #f1f5f9;
+    background: var(--bg-tertiary);
     border: none;
     border-radius: 8px 8px 0 0;
     cursor: pointer;
     font-weight: 500;
     transition: all 0.3s ease;
+    color: var(--text-secondary);
 }
 
-.dark-mode .tab-btn {
-    padding: 12px 24px;
-    background: rgb(117, 117, 117) ;
-    border: none;
-    border-radius: 8px 8px 0 0;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    color: white;
+.tab-btn:hover {
+    background: var(--border-color);
 }
 
 .tab-btn.active {
@@ -713,8 +753,32 @@ const refreshData = async () => {
     color: white;
 }
 
+.tab-btn.warning {
+    background: #fed7aa;
+    color: #92400e;
+}
+
+.dark-mode .tab-btn.warning {
+    background: #7c2d12;
+    color: #fed7aa;
+}
+
 .tab-btn.warning.active {
     background: #f97316;
+    color: white;
+}
+
+.dark-mode .tab-btn {
+    background: #374151;
+    color: #d1d5db;
+}
+
+.dark-mode .tab-btn:hover {
+    background: #4b5563;
+}
+
+.dark-mode .tab-btn.active {
+    background: #2563eb;
 }
 
 .employee-cards {
@@ -724,19 +788,18 @@ const refreshData = async () => {
 }
 
 .employee-card {
-    background: white;
+    background: var(--bg-secondary);
     border-radius: 12px;
     padding: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--card-shadow);
     border-left: 4px solid #10b981;
+    transition: all 0.3s ease;
+    border: 1px solid var(--border-color);
 }
 
-.dark-mode .employee-card {
-    background: rgb(47, 47, 47);
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    border-left: 4px solid #10b981;
+.employee-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
 .employee-card.excellent {
@@ -774,16 +837,11 @@ const refreshData = async () => {
 .employee-info h4 {
     margin: 0;
     font-size: 1.2rem;
+    color: var(--text-primary);
 }
 
 .employee-position {
-    color: #64748b;
-    margin: 4px 0;
-    font-size: 0.9rem;
-}
-
-.dark-mode .employee-position {
-    color: #e6e6e6;
+    color: var(--text-tertiary);
     margin: 4px 0;
     font-size: 0.9rem;
 }
@@ -797,6 +855,11 @@ const refreshData = async () => {
     display: inline-block;
 }
 
+.dark-mode .employee-dept {
+    background: #1e3a8a;
+    color: #93c5fd;
+}
+
 .performance-badge {
     margin-left: auto;
     padding: 4px 12px;
@@ -807,9 +870,19 @@ const refreshData = async () => {
     font-weight: 500;
 }
 
+.dark-mode .performance-badge {
+    background: #14532d;
+    color: #86efac;
+}
+
 .performance-badge.warning {
     background: #fef3c7;
     color: #92400e;
+}
+
+.dark-mode .performance-badge.warning {
+    background: #7c2d12;
+    color: #fde68a;
 }
 
 .performance-metrics {
@@ -823,20 +896,16 @@ const refreshData = async () => {
     display: flex;
     justify-content: space-between;
     padding: 8px 0;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .metric-label {
-    color: #64748b;
-}
-
-.dark-mode .metric-label {
-    color: #fefefe;
+    color: var(--text-tertiary);
 }
 
 .metric-value {
     font-weight: 600;
-    margin-left: 8px;
+    color: var(--text-primary);
 }
 
 .metric-value.excellent {
@@ -852,7 +921,7 @@ const refreshData = async () => {
 }
 
 .employee-notes {
-    background: #f8fafc;
+    background: var(--bg-tertiary);
     padding: 16px;
     border-radius: 8px;
     margin-top: 16px;
@@ -861,6 +930,7 @@ const refreshData = async () => {
 .employee-notes p {
     margin: 8px 0;
     font-size: 0.9rem;
+    color: var(--text-secondary);
 }
 
 .action-required {
@@ -870,9 +940,17 @@ const refreshData = async () => {
     margin-top: 16px;
 }
 
+.dark-mode .action-required {
+    background: #78350f;
+}
+
 .action-required h4 {
     margin: 0 0 8px 0;
     color: #92400e;
+}
+
+.dark-mode .action-required h4 {
+    color: #fde68a;
 }
 
 .action-required ul {
@@ -883,6 +961,10 @@ const refreshData = async () => {
 .action-required li {
     margin: 4px 0;
     color: #92400e;
+}
+
+.dark-mode .action-required li {
+    color: #fed7aa;
 }
 
 .employee-actions {
@@ -900,85 +982,53 @@ const refreshData = async () => {
     color: white;
     cursor: pointer;
     font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.action-btn:hover {
+    background: #2563eb;
 }
 
 .action-btn.secondary {
-    background: #64748b;
+    background: var(--text-tertiary);
+}
+
+.action-btn.secondary:hover {
+    background: var(--text-secondary);
 }
 
 .action-btn.warning {
     background: #f97316;
 }
 
-.department-comparison {
-    background: white;
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 32px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.action-btn.warning:hover {
+    background: #ea580c;
 }
 
-.dept-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
-    margin-top: 20px;
+.dark-mode .action-btn {
+    background: #2563eb;
 }
 
-.dept-card {
-    background: #f8fafc;
-    padding: 20px;
-    border-radius: 8px;
-    border-left: 4px solid #3b82f6;
+.dark-mode .action-btn:hover {
+    background: #1d4ed8;
 }
 
-.dept-card h4 {
-    margin: 0 0 16px 0;
-    color: #1e293b;
+.dark-mode .action-btn.secondary {
+    background: #4b5563;
 }
 
-.dept-metric {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #e2e8f0;
+.dark-mode .action-btn.secondary:hover {
+    background: #374151;
 }
 
-.export-section {
-    background: white;
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.export-options {
-    display: flex;
-    gap: 16px;
-    margin-top: 20px;
-}
-
-.export-btn {
-    flex: 1;
-    padding: 16px;
-    border: none;
-    border-radius: 8px;
-    background: #10b981;
-    color: white;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 1rem;
-}
-
-.export-btn.secondary {
-    background: #3b82f6;
-}
-
-.export-btn.warning {
-    background: #f97316;
+.category-content h3 {
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
 }
 
 @media (max-width: 768px) {
-
     .performance-evaluation {
         padding: 16px;
     }
@@ -1008,6 +1058,7 @@ const refreshData = async () => {
     .tab-btn {
         width: 100%;
         border-radius: 8px;
+        margin-bottom: 4px;
     }
 
     .employee-card {
@@ -1041,16 +1092,38 @@ const refreshData = async () => {
         width: 100%;
     }
 
-    .dept-stats {
-        grid-template-columns: 1fr;
+    .filter-section {
+        flex-direction: column;
+        align-items: stretch;
     }
 
-    .export-options {
+    .filter-group {
+        width: 100%;
+    }
+
+    .reset-btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-actions {
         flex-direction: column;
     }
 
-    .export-btn {
+    .refresh-btn,
+    .export-report-btn {
         width: 100%;
+        justify-content: center;
+    }
+
+    .performance-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .metric {
+        flex-direction: column;
+        gap: 4px;
     }
 }
 </style>
