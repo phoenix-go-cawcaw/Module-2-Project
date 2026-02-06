@@ -190,17 +190,14 @@ export default {
 
             this.calendarDays = [];
 
-            // Add empty cells for days before the first day of the month
             for (let i = 0; i < firstDay; i++) {
                 this.calendarDays.push({ day: null, isCurrentMonth: false });
             }
 
-            // Add days of the current month
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateStr = `${this.currentYear}-${String(this.currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const dateObj = new Date(this.currentYear, this.currentMonth, day);
 
-                // Check if there are approved leave requests on this day
                 const leaveOnThisDay = this.approvedRequests.filter(request => {
                     const startDate = new Date(request.originalStartDate);
                     const endDate = new Date(request.originalEndDate);
@@ -669,7 +666,6 @@ export default {
             </div>
         </div>
 
-        <!-- Add New Request Modal -->
         <div v-if="showAddModal" class="edit-modal">
             <div class="edit-card">
                 <h3>Submit New Leave Request</h3>
